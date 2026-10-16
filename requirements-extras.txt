@@ -1,0 +1,3 @@
+# B3 semantic layer (within-batch impostor detection) — opt-in, heavy wheels
+sentence-transformers>=3.0
+faiss-cpu>=1.8

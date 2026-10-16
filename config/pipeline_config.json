@@ -1,0 +1,22 @@
+{
+  "expected_invoice_count": 17,
+  "llm": {
+    "provider": "ollama",
+    "base_url": "http://127.0.0.1:11434",
+    "model": "llama3.2:3b",
+    "temperature": 0.0,
+    "prompt_version": "ap-extract-v1"
+  },
+  "verification": {
+    "money_tolerance": "0.01",
+    "authority": "subtotal_plus_vat"
+  },
+  "vendor_match": {
+    "fuzzy_threshold": 0.85
+  },
+  "duplicates": {
+    "cosine_threshold": 0.85,
+    "amount_tolerance_pct": 2.0,
+    "date_window_days": 30
+  }
+}

@@ -1,0 +1,5 @@
+# Core runtime — deterministic path (S2 ingest, verification, outputs)
+PyMuPDF>=1.24
+pytest>=8.0
+# NOTE: the AI-primary path (extract_ai.py) talks to a LOCAL Ollama server over stdlib HTTP —
+# no Python package, no API key, nothing to install for AI to work.

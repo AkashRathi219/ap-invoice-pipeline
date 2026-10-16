@@ -1,0 +1,5 @@
+# G2 — cross-platform hygiene: normalise text to LF in the repo regardless of OS.
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary

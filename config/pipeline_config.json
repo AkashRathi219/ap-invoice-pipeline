@@ -17,6 +17,13 @@
   "duplicates": {
     "cosine_threshold": 0.85,
     "amount_tolerance_pct": 2.0,
-    "date_window_days": 30
+    "date_window_days": 30,
+    "quantity_match_threshold": 0.95,
+    "evidence_floor": 0.60,
+    "embedding_backend": "auto"
+  },
+  "enrichment": {
+    "author_messages": true
   }
 }
+

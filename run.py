@@ -6,6 +6,11 @@
     python run.py --limit 3       # first N invoices (quick demo)
     python run.py --only 03788    # one invoice by filename fragment
 
+Two passes, because duplication has two different scopes: **pass 1** extracts, verifies, links and
+applies R1–R6 plus the vendor-scoped historic check (R5b) invoice by invoice; **pass 2** compares the
+whole batch for semantic near-duplicates (R5a), then folds every layer into one disposition ladder
+and writes the plain-language messages.
+
 Exit codes: 0 = pipeline completed · 1 = control record failed (wrong file count) ·
             2 = extraction failure on at least one invoice.
 """
@@ -25,10 +30,19 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.extract_ai import extract_invoice_ai, extract_invoice_fallback_regex  # noqa: E402
 from src.extract_regex import ExtractionError, extract_invoice_regex, read_pdf_text  # noqa: E402
+from src.duplicates import (  # noqa: E402
+    Embedder,
+    check_historic,
+    find_within_batch_pairs,
+    forensic_verdict,
+    load_historic,
+    pair_rule,
+)
+from src.enrich import enrich_record  # noqa: E402
 from src.fx import fx_as_of, load_fx_table, to_eur  # noqa: E402
 from src.ingest import ingest  # noqa: E402
 from src.llm_provider import LLMBadOutput, LLMUnavailable, is_reachable, unload  # noqa: E402
-from src.rules import disposition, run_rules  # noqa: E402
+from src.rules import disposition, reason_codes, run_rules  # noqa: E402
 from src.validate_extract import verify  # noqa: E402
 from src.vendor_match import load_vendor_master, match_vendor  # noqa: E402
 
@@ -70,18 +84,24 @@ def main() -> int:
 
     config = json.loads((REPO_ROOT / "config" / "pipeline_config.json").read_text(encoding="utf-8"))
     llm_cfg = config["llm"]
+    dup_cfg = config.get("duplicates", {})
+    enrich_cfg = config.get("enrichment", {})
     expected = config["expected_invoice_count"]
 
     fx_table = load_fx_table()
     fx_as_of_date = fx_as_of()
-    vendor_master = load_vendor_master()
 
     data_dir = resolve_data_dir(args.data_dir)
+    vendor_master = load_vendor_master(data_dir / "vendor_master.csv")
+    historic = load_historic(data_dir / "historic_invoices.csv")
+    embedder = Embedder(dup_cfg.get("embedding_backend", "auto"))
     control = ingest(data_dir / "invoices", expected)
     print(f"AP pipeline — AI-primary extraction "
           f"(model={llm_cfg['model']}, prompt={llm_cfg['prompt_version']})")
     print(f"Control record: {control.found}/{control.expected} PDFs · unique SHA-256: "
           f"{'yes' if not control.duplicate_hashes else 'NO — DUPLICATES PRESENT'} · dir: {control.invoices_dir}")
+    print(f"Reference data: {len(vendor_master)} vendors · {len(historic)} historic invoices · "
+          f"similarity backend: {embedder.name}")
     if not control.ok or control.duplicate_hashes:
         return 1
 
@@ -103,6 +123,7 @@ def main() -> int:
 
     records: list[dict] = []
     telemetry: list[dict] = []
+    telemetry_by_file: dict[str, dict] = {}
     extraction_failures = 0
 
     for i, f in enumerate(files, 1):
@@ -162,7 +183,39 @@ def main() -> int:
             "as_of": fx_evidence["as_of"],
             "fx_known": fx_evidence["fx_known"],
         }
-        record["rules"] = {"results": rule_results, "disposition": disp}
+        record["vendor_master"] = {
+            "vendor_id": vendor_match.vendor_id,
+            "vendor_name_matched": vendor_match.vendor_name_matched,
+            "status": (vendor_match.vendor_row.status if vendor_match.vendor_row else None),
+            "category": (vendor_match.vendor_row.category if vendor_match.vendor_row else None),
+            "country": (vendor_match.vendor_row.country if vendor_match.vendor_row else None),
+            "approved_currency": (vendor_match.vendor_row.approved_currency if vendor_match.vendor_row else None),
+            "spend_threshold_eur": (vendor_match.vendor_row.spend_threshold_eur if vendor_match.vendor_row else None),
+            "requires_dual_approval": (bool(vendor_match.vendor_row.requires_dual_approval)
+                                       if vendor_match.vendor_row else None),
+            "payment_terms_days": (vendor_match.vendor_row.payment_terms_days
+                                   if vendor_match.vendor_row else None),
+            "contact_email": (vendor_match.vendor_row.contact_email if vendor_match.vendor_row else None),
+        }
+        record["fx"] = {
+            "currency": fx_evidence["currency"],
+            "amount_in_currency": fx_evidence["amount"],
+            "amount_eur": fx_evidence["amount_eur"],
+            "rate_to_eur": fx_evidence["rate"],
+            "as_of": fx_evidence["as_of"],
+            "fx_known": fx_evidence["fx_known"],
+        }
+        # R5b — vendor-scoped metadata match against history: evidence always, flag only inside tolerance ∧ window.
+        historic_check = check_historic(
+            record,
+            historic,
+            amount_tolerance_pct=dup_cfg.get("amount_tolerance_pct", 2.0),
+            date_window_days=dup_cfg.get("date_window_days", 30),
+        )
+        record["duplicates"] = {"vs_historic": historic_check, "within_batch": [], "impostor_verdicts": []}
+        # The disposition is provisional here: R5a is a batch layer, appended in the pass below.
+        record["rules"] = {"results": rule_results + [historic_check],
+                           "disposition": disposition(rule_results + [historic_check])}
 
         telemetry.append({
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -181,9 +234,10 @@ def main() -> int:
             "vendor_match_status": record["vendor_match"]["status"],
             "amount_eur": record["fx"]["amount_eur"],
             "fx_known": record["fx"]["fx_known"],
-            "disposition": disp,
-            "reason_codes": [r["reason_code"] for r in rule_results if r["reason_code"]],
+            "disposition": None,  # completed after the duplicate layer (pass 2)
+            "reason_codes": [],
         })
+        telemetry_by_file[f.name] = telemetry[-1]
 
         inv = record.get("invoice_number") or "?"
         vendor = (record.get("vendor_name") or "?")[:22]
@@ -200,8 +254,63 @@ def main() -> int:
         print(f"[{i:2}/{len(files)}] {f.name:<44} {inv:<18} {vendor:<22} "
               f"{str(total):>12} {cur:<4} math={'ok' if v['line_math_ok'] else 'FAIL'} "
               f"agr={v.get('agreement_score') or '-':>6} total={flag} "
-              f"{record.get('latency_ms') or 0:>4}ms disp={record['rules']['disposition']} "
-              f"vnd={vendor_match.status} fx={fx_evidence['fx_known']}")
+              f"{record.get('latency_ms') or 0:>4}ms vnd={vendor_match.status} "
+              f"fx={fx_evidence['fx_known']}")
+
+    # ------------------------------------------------------------------ S7/S8: duplicate layer
+    pairs = find_within_batch_pairs(
+        records,
+        embedder,
+        cosine_threshold=dup_cfg.get("cosine_threshold", 0.85),
+        quantity_match_threshold=dup_cfg.get("quantity_match_threshold", 0.95),
+        evidence_floor=dup_cfg.get("evidence_floor", 0.60),
+    )
+    by_invoice = {str(r.get("invoice_number") or r.get("source_file")): r for r in records}
+    for pair in pairs:
+        # every measured pair is published on both invoices as scored evidence
+        for label in (pair.a_invoice, pair.b_invoice):
+            target = by_invoice.get(label)
+            if target is not None:
+                target["duplicates"]["within_batch"].append(pair.to_dict())
+        if not pair.flagged:
+            continue
+        record_a, record_b = by_invoice.get(pair.a_invoice), by_invoice.get(pair.b_invoice)
+        if record_a is None or record_b is None:
+            continue
+        verdict = forensic_verdict(pair, record_a, record_b, llm_cfg if ai_available else None)
+        rule = pair_rule(pair)
+        for record, other in ((record_a, (pair.b_invoice, pair.b_vendor)),
+                              (record_b, (pair.a_invoice, pair.a_vendor))):
+            record["rules"]["results"].append(rule)
+            record["duplicates"]["impostor_verdicts"].append({
+                "rule_id": "R5a",
+                "counterparty_invoice": other[0],
+                "counterparty_vendor": other[1],
+                "verdict": verdict,
+            })
+        print(f"R5a IMPOSTOR CANDIDATE: {pair.a_vendor} ↔ {pair.b_vendor} — "
+              f"cosine {pair.description_cosine:.3f} · qty match {pair.quantity_match:.2f} · "
+              f"prices {pair.unit_price_ratio * 100:.1f}% · "
+              f"verdict {verdict['risk_level']} ({verdict['source']})")
+
+    for record in records:
+        results = record["rules"]["results"]
+        record["rules"]["disposition"] = disposition(results)
+        record["enrichment"] = enrich_record(
+            record,
+            llm_cfg=(llm_cfg if ai_available else None),
+            author=enrich_cfg.get("author_messages", True),
+        )
+        trail = telemetry_by_file.get(record["source_file"])
+        if trail is not None:
+            trail["disposition"] = record["rules"]["disposition"]
+            trail["reason_codes"] = reason_codes(results)
+            trail["within_batch_flags"] = sum(
+                1 for p in record["duplicates"]["within_batch"] if p["flagged"])
+            trail["impostor_risk"] = (
+                record["duplicates"]["impostor_verdicts"][0]["verdict"]["risk_level"]
+                if record["duplicates"]["impostor_verdicts"] else None)
+            trail["message_source"] = (record["enrichment"]["message"] or {}).get("source")
 
     # ---- outputs ------------------------------------------------------------
     out_dir = REPO_ROOT / "output"
@@ -243,10 +352,38 @@ def main() -> int:
         d = (r.get("rules") or {}).get("disposition") or "CLEAR"
         dispositions[d] = dispositions.get(d, 0) + 1
     flagged = [r for r in records if (r.get("rules") or {}).get("disposition") != "CLEAR"]
+
+    exact_hist = sum(1 for r in records
+                     if (r["duplicates"]["vs_historic"]["exact_matches"]))
+    flagged_hist = sum(1 for r in records
+                       if r["duplicates"]["vs_historic"]["status"] == "flag")
+    clone_pairs = sum(1 for p in pairs if p.flagged)
+    published_pairs = len(pairs)
+    messages = sum(1 for r in records if (r.get("enrichment") or {}).get("message"))
+    llm_messages = sum(1 for r in records
+                       if ((r.get("enrichment") or {}).get("message") or {}).get("source") == "llm")
+    note_tells = sum(len((r.get("enrichment") or {}).get("note_tells") or []) for r in records)
+
+    print(f"Duplicate layer: historic exact {exact_hist} · historic flagged {flagged_hist} · "
+          f"within-batch pairs published {published_pairs} (clone packages {clone_pairs}) · "
+          f"backend {embedder.name}")
+    for pair in pairs:
+        mark = "FLAG" if pair.flagged else "evid"
+        print(f"  {mark} {pair.a_vendor[:20]:<20} ↔ {pair.b_vendor[:20]:<20} "
+              f"cos={pair.description_cosine:.3f} qty={pair.quantity_match:.2f} "
+              f"price={('%.1f%%' % (pair.unit_price_ratio * 100)) if pair.unit_price_ratio else 'n/a':>7} "
+              f"{pair.pattern}")
+    print(f"Enrichment: {messages} authored messages ({llm_messages} LLM · "
+          f"{messages - llm_messages} template) · {note_tells} informational note tells")
     print(f"Dispositions: {dispositions}")
     for r in flagged:
-        reasons = [res.get("reason_code") for res in (r.get("rules") or {}).get("results") or [] if res.get("reason_code")]
-        print(f"  {r.get('source_file')}: {r.get('rules', {}).get('disposition')} — {'; '.join(reasons)}")
+        reasons = reason_codes((r.get("rules") or {}).get("results") or [])
+        message = ((r.get("enrichment") or {}).get("message") or {})
+        print(f"  {r.get('invoice_number') or r.get('source_file')}: "
+              f"{r.get('rules', {}).get('disposition')} — {'; '.join(reasons)}")
+        if message:
+            print(f"      → {message.get('channel')} note ({message.get('source')}): "
+                  f"{message.get('next_action')}")
     print(f"Wrote: output/extraction_records.json · output/ai_telemetry.jsonl")
 
     # ---- free the model from RAM the moment computation stops (directive) ----

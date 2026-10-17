@@ -5,9 +5,14 @@ R2  currency             — invoice currency vs master approved_currency (L4) -
 R3  spend threshold     — EUR-normalised amount (L5, via `src/fx.py`) vs master threshold -> above -> FLAG-REVIEW
 R4  dual approval       — master requires_dual_approval (L6) -> TRUE -> FLAG-REVIEW (two approvers)
 R6  PO presence         — P6 `po_number` present? -> missing -> HOLD
+R5a/R5b duplicate tells are produced by `src/duplicates.py` and appended to this list.
+
+Status vocabulary: `pass` · `skip` (not applicable, e.g. no master record to compare against) ·
+`flag` (needs a human: mismatch/above-threshold/dual-approval/unverified-total/duplicate evidence) ·
+`HOLD` (structural stop: unknown or inactive vendor, unrecognised currency, missing PO).
 
 Disposition ladder: HOLD > FLAG-REVIEW > CLEAR. The LLM never writes a disposition —
-these reason codes are the only source of truth (A4 reads them, never upgrades them).
+these reason codes are the only source of truth (the message layer reads them, never overrides them).
 """
 from __future__ import annotations
 
@@ -43,6 +48,9 @@ def check_currency(record: dict, vendor_match: VendorMatch) -> dict:
     """R2 — invoice currency vs master approved_currency (L4)."""
     currency = str(record.get("currency") or "").strip().upper()
     row = vendor_match.vendor_row
+    if row is None:
+        return {"rule_id": "R2", "status": "skip", "reason_code": None,
+                "detail": "no master record — approved currency not applicable (R1 already holds)"}
     approved = str(getattr(row, "approved_currency", None) or "").strip().upper()
     if not currency or currency not in _KNOWN_CURRENCIES:
         return {"rule_id": "R2", "status": HOLD, "reason_code": "R2_currency_unrecognised",
@@ -58,10 +66,16 @@ def check_currency(record: dict, vendor_match: VendorMatch) -> dict:
 
 
 def check_threshold(amount_eur, vendor_row: VendorRow | None) -> dict:
-    """R3 — EUR-normalised amount (L5) vs master spend threshold."""
+    """R3 — EUR-normalised amount (L5) vs the master spend threshold.
+
+    An unverified total is a **review flag**, not a structural hold: the invoice is well formed,
+    the two readers simply disagree about one number, and a human resolves that disagreement.
+    Either way the invoice cannot reach the payment queue automatically.
+    """
     if amount_eur is None:
-        return {"rule_id": "R3", "status": HOLD, "reason_code": "R3_amount_unavailable",
-                "detail": "no EUR-normalised amount to compare against threshold"}
+        return {"rule_id": "R3", "status": "flag", "reason_code": "R3_amount_unavailable",
+                "detail": "readers disagree on the total — no verified EUR amount to compare "
+                          "against the threshold (approver reviews the read)"}
     threshold = vendor_row.spend_threshold_eur if vendor_row is not None else None
     if threshold is None:
         return {"rule_id": "R3", "status": HOLD, "reason_code": "R3_threshold_unavailable",
@@ -110,3 +124,13 @@ def disposition(results: list[dict]) -> str:
     if any(r["status"] == "flag" for r in results):
         return FLAG_REVIEW
     return CLEAR
+
+
+def active_reasons(results: list[dict]) -> list[dict]:
+    """The rule results that stopped a CLEAR — ordered, with their reason codes only."""
+    return [r for r in results if r.get("reason_code")]
+
+
+def reason_codes(results: list[dict]) -> list[str]:
+    """Reason codes carried by the non-CLEAR results, in rule order."""
+    return [r["reason_code"] for r in active_reasons(results)]

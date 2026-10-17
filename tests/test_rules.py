@@ -77,9 +77,19 @@ def test_r3_above_threshold_after_fx_is_flag():
     assert ok["reason_code"] is None
 
 
-def test_r3_missing_amount_is_hold():
-    assert check_threshold(None, _vendor_row())["status"] == HOLD
-    assert check_threshold(None, _vendor_row())["reason_code"] == "R3_amount_unavailable"
+def test_r3_unverified_amount_is_review_flag():
+    """An unverified total is a review flag (a human resolves the read), never a silent pass."""
+    result = check_threshold(None, _vendor_row())
+    assert result["status"] == "flag"
+    assert result["reason_code"] == "R3_amount_unavailable"
+    assert result["status"] != HOLD
+
+
+def test_r2_is_skipped_without_a_master_record():
+    m = _match(vendor_id=None, status="unknown", row=None)
+    result = check_currency(_record(), m)
+    assert result["status"] == "skip"
+    assert result["reason_code"] is None
 
 
 def test_r4_dual_approval_is_flag():

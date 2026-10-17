@@ -149,6 +149,11 @@ def _counterparty(record: dict) -> str:
     return ""
 
 
+def counterparty_of(record: dict) -> str:
+    """Public counterparty reference (invoice + vendor) for the human review screen."""
+    return _counterparty(record)
+
+
 def sort_key(record: dict):
     decision = decision_of(record)
     return (DISPOSITION_ORDER.get(decision.get("disposition"), 9),
@@ -180,6 +185,9 @@ def measured_totals(records: Iterable[dict]) -> dict:
 def verify_oracle(records: Iterable[dict], oracle: dict | None = None) -> dict:
     """Compare measured dispositions against the committed §5.3 oracle, invoice by invoice.
 
+    A batch sharing zero invoice numbers with a non-empty fixture is out of scope:
+    applicable False, status N/A, no mismatch or missing listings.
+
     Where called:
         Called inside build_outputs() and in tests/test_summarize.py.
 
@@ -202,8 +210,22 @@ def verify_oracle(records: Iterable[dict], oracle: dict | None = None) -> dict:
             mismatches.append({"invoice_number": invoice, "expected": want, "measured": got})
     missing = sorted(set(expected_by_invoice) - seen)
     totals_ok = all(measured.get(k, 0) == v for k, v in expected.items())
+    if expected_by_invoice and not (seen & set(expected_by_invoice)):
+        return {
+            "ok": True,
+            "applicable": False,
+            "status": "N/A",
+            "expected_totals": expected,
+            "measured_totals": measured,
+            "mismatches": [],
+            "missing_invoices": [],
+            "source": oracle.get("source"),
+        }
+    ok = totals_ok and not mismatches and not missing
     return {
-        "ok": totals_ok and not mismatches and not missing,
+        "ok": ok,
+        "applicable": True,
+        "status": "MATCH" if ok else "DIFF",
         "expected_totals": expected,
         "measured_totals": measured,
         "mismatches": mismatches,
@@ -516,7 +538,9 @@ def render_report_html(records: list[dict], meta: dict, oracle_result: dict) -> 
     records = list(records)
     totals = measured_totals(records)
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    if oracle_result.get("ok"):
+    if oracle_result.get("status") == "N/A":
+        badge = '<span class="badge info">ORACLE N/A — custom dataset</span>'
+    elif oracle_result.get("ok"):
         expected = oracle_result.get("expected_totals") or {}
         badge = (f'<span class="badge ok">ORACLE MATCH — CLEAR {expected.get("CLEAR")} · '
                  f'FLAG-REVIEW {expected.get("FLAG-REVIEW")} · HOLD {expected.get("HOLD")}</span>')
@@ -610,11 +634,14 @@ def write_summary_md(records: list[dict], meta: dict, oracle_result: dict,
     out.append(f"| FLAG-REVIEW | {totals.get('FLAG-REVIEW', 0)} | a human checks before approval |")
     out.append(f"| HOLD | {totals.get('HOLD', 0)} | a mandatory condition failed — payment blocked |")
     out.append("")
-    out.append(f"**Oracle §5.3 check:** {'MATCH' if oracle_ok else 'DIFF'} — expected "
-               f"CLEAR {expected.get('CLEAR', '?')} · FLAG-REVIEW {expected.get('FLAG-REVIEW', '?')} · "
-               f"HOLD {expected.get('HOLD', '?')}. "
-               + ("Every invoice matches the committed fixture."
-                  if oracle_ok else "See `batch_report.json` for the differences."))
+    if oracle_result.get("status") == "N/A":
+        out.append("**Oracle §5.3 check:** N/A (custom dataset)")
+    else:
+        out.append(f"**Oracle §5.3 check:** {'MATCH' if oracle_ok else 'DIFF'} — expected "
+                   f"CLEAR {expected.get('CLEAR', '?')} · FLAG-REVIEW {expected.get('FLAG-REVIEW', '?')} · "
+                   f"HOLD {expected.get('HOLD', '?')}. "
+                   + ("Every invoice matches the committed fixture."
+                      if oracle_ok else "See `batch_report.json` for the differences."))
     out.append("")
 
     if exceptions:

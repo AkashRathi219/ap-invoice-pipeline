@@ -1,6 +1,19 @@
+# Python
 __pycache__/
 *.pyc
-.pytest_cache/
-output/
+*.pyo
 .venv/
 venv/
+
+# Test / tool caches
+.pytest_cache/
+
+# Regenerated run artefacts (the committed reference lives in sample_output/)
+output/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

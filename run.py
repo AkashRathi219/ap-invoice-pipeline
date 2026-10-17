@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
 from src import decide as decide_mod
-from src import feedback, summarize
+from src import feedback, review, summarize
 from src.duplicates import (
     Embedder,
     check_historic,
@@ -50,6 +51,11 @@ def _json_default(value):
     if isinstance(value, Decimal):
         return format(value, "f")
     raise TypeError(f"not JSON-serialisable: {type(value)!r}")
+
+
+def load_config() -> dict:
+    """Reads config/pipeline_config.json (module-level seam so tests can pin a batch size)."""
+    return json.loads((REPO_ROOT / "config" / "pipeline_config.json").read_text(encoding="utf-8"))
 
 
 def resolve_data_dir(data_dir: str | None = None) -> Path:
@@ -85,9 +91,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only", default=None, help="invoices whose filename contains this fragment")
     parser.add_argument("--no-ai", action="store_true", help="skip the LLM (regex_fallback demo)")
     parser.add_argument("--keep-loaded", action="store_true", help="do not unload the model at the end")
+    parser.add_argument("--review", action="store_true", help="open the interactive terminal review screen (auto-skipped when stdin is not a TTY)")
     args = parser.parse_args(argv)
 
-    cfg = json.loads((REPO_ROOT / "config" / "pipeline_config.json").read_text(encoding="utf-8"))
+    cfg = load_config()
     llm_cfg = cfg["llm"]
     dup_cfg = cfg.get("duplicates", {})
     decide_cfg = cfg.get("decide", {})
@@ -97,10 +104,14 @@ def main(argv: list[str] | None = None) -> int:
 
     data_dir = resolve_data_dir(args.data_dir)
     invoices_dir = data_dir / "invoices"
-    expected = int(cfg.get("expected_invoice_count") or len(list(invoices_dir.glob("*.pdf"))))
+    raw_expected = cfg.get("expected_invoice_count")
+    expected = int(raw_expected) if raw_expected else None
     control = ingest(invoices_dir, expected)
+    mode_note = (f"{control.mode} (expected_invoice_count={control.expected})" if control.pinned
+                 else f"{control.mode} (no truncation control)")
     print(f"Control record: {control.found}/{control.expected} PDFs · unique SHA-256: "
-          f"{'yes' if not control.duplicate_hashes else 'NO — DUPLICATES PRESENT'} · dir: {control.invoices_dir}")
+          f"{'yes' if not control.duplicate_hashes else 'NO — DUPLICATES PRESENT'} · "
+          f"control mode: {mode_note} · dir: {control.invoices_dir}")
     if not control.ok or control.duplicate_hashes:
         return 1
 
@@ -110,7 +121,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit:
         files = files[: args.limit]
     if not files:
-        print("nothing to process after --only/--limit")
+        if not control.files:
+            print(f"no PDFs found in {control.invoices_dir} — nothing to process")
+        else:
+            print("nothing to process after --only/--limit")
         return 2
 
     ai_available = (not args.no_ai) and is_reachable(llm_cfg["base_url"])
@@ -252,7 +266,20 @@ def main(argv: list[str] | None = None) -> int:
     (out_dir / "extraction_records.json").write_text(
         json.dumps(records, default=_json_default, indent=2, ensure_ascii=False), encoding="utf-8")
     summarize.build_outputs(records, meta, out_dir)
-    feedback.write_all(records, out_dir, out_dir)
+
+    # Human-in-the-loop review: additive overlay. Machine artefacts above remain the immutable
+    # first-run record; reviewer actions live in a separate append-only journal.
+    events = review.load_events(out_dir)
+    if args.review:
+        if sys.stdin.isatty():
+            events = review.run_review(records, out_dir, prior=events)
+        else:
+            print("\n--review requested but stdin is not an interactive terminal - "
+                  "skipping the review screen (machine results above are unaffected).")
+
+    telemetry_rows = [feedback.run_telemetry_row(r) for r in records]
+    feedback.write_all(records, out_dir, out_dir, telemetry_rows=telemetry_rows, feedback=events)
+    suggestion = feedback.recommend_thresholds(telemetry_rows, events)
 
     # -------------------------------------------------------- console summary
     totals = summarize.measured_totals(records)
@@ -271,7 +298,11 @@ def main(argv: list[str] | None = None) -> int:
           f"Within-Batch Pairs: {len(pairs)} ({len(flagged_pairs)} flagged)")
     print(f"Dispositions     : CLEAR {totals.get('CLEAR', 0)} · "
           f"FLAG-REVIEW {totals.get('FLAG-REVIEW', 0)} · HOLD {totals.get('HOLD', 0)}")
-    if oracle_result["ok"]:
+    # N/A carries ok True: the status is tested before the ok branch so a custom dataset
+    # never receives the mismatch/missing listings.
+    if oracle_result["status"] == "N/A":
+        print("Oracle Status    : N/A — custom dataset (no overlap with the §5.3 assessment set)")
+    elif oracle_result["ok"]:
         expected = oracle_result["expected_totals"]
         print(f"Oracle Status    : MATCH (CLEAR {expected.get('CLEAR')} · "
               f"FLAG-REVIEW {expected.get('FLAG-REVIEW')} · HOLD {expected.get('HOLD')})")
@@ -302,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    -> [{b.get('rule_id')}] {b.get('detail')}")
         if decision.get("next_action"):
             print(f"    -> Action: {decision.get('next_action')}")
-        counter = summarize._counterparty(record)
+        counter = summarize.counterparty_of(record)
         if counter:
             print(f"    -> Matched Counterparty: {counter}")
         print()
@@ -331,11 +362,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  * {code:<28} : {count} invoice(s) -- {rule_desc}")
     print("-" * 95)
 
+    if events:
+        print()
+        print(review.render_review_report(records, events, suggestion))
+        review.write_review_summary(out_dir, records, events, suggestion)
+
     print()
     print(f"Wrote Artefacts to: {out_dir}")
-    for key in ("summary.md", "exceptions.csv", "invoices_processed.csv", "report.html",
-                "batch_report.json", "audit_log.jsonl", "ai_telemetry.jsonl",
-                "fine_tuning_dataset.jsonl", "threshold_suggestions.json"):
+    keys = ["summary.md", "exceptions.csv", "invoices_processed.csv", "report.html",
+            "batch_report.json", "audit_log.jsonl", "ai_telemetry.jsonl",
+            "fine_tuning_dataset.jsonl", "few_shot_bank.json", "threshold_suggestions.json"]
+    # the review artefacts only exist once a review session wrote them into this out_dir
+    keys += [name for name in (review.JOURNAL_NAME, review.SUMMARY_NAME)
+             if (out_dir / name).exists()]
+    for key in keys:
         print(f"  - {key}")
 
     if ai_available and not args.keep_loaded and unload(llm_cfg["model"], llm_cfg["base_url"]):

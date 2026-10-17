@@ -33,8 +33,9 @@ python run.py --no-ai         # Full pipeline with zero AI — deterministic fal
 python run.py --limit 5       # Quick demo: process first N invoices
 python run.py --only 03760    # Process one invoice by filename fragment
 python run.py --out-dir sample_output   # Write output artefacts anywhere
+python run.py --review        # After the run: interactive terminal review of the exception queue
 
-python -m pytest -q           # 145 offline tests — no live network/LLM needed
+python -m pytest -q           # 171 offline tests — no live network/LLM needed
 ```
 
 **The AI path needs a local Ollama** (`ollama pull llama3.2:3b`, then `ollama serve` — default
@@ -42,6 +43,23 @@ python -m pytest -q           # 145 offline tests — no live network/LLM needed
 running, `python run.py` falls back to the named `regex_fallback` path with a loud warning and
 still completes; `--no-ai` forces that path deliberately. Exit codes: `0` ok · `1` control-record
 failure · `2` nothing readable.
+
+**Human review.** `python run.py --review` opens an interactive terminal review of the non-CLEAR
+exception queue after the run (ACCEPT / REJECT / OVERRIDE / SKIP / QUIT). The menu opens only
+when `stdin` is a TTY — in a pipe or CI it prints `not an interactive terminal` and continues.
+
+**Batch size & the §5.3 oracle — dataset-agnostic ingest.** The ingest count expectation
+**defaults to auto-detect**: `expected_invoice_count: null` in `config/pipeline_config.json`
+(or the key absent) derives the batch size from the PDFs actually present in the input
+directory — any N-PDF batch is processed as-is, with no truncation control. Setting a
+**positive integer pins a strict gate** instead: a count mismatch aborts with exit code 1
+*before any extraction or model call*, and the `Control record:` console line always names the
+active mode (`control mode: strict (expected_invoice_count=<M>)` vs
+`control mode: auto-detect (no truncation control)`). Duplicate SHA-256 hashes fail with exit
+code 1 in **both** modes. The golden oracle is scoped to the §5.3 assessment set: a batch that
+shares **no** invoice number with `config/oracle_dispositions.json` reports
+`Oracle Status : N/A` rather than a false DIFF, while any overlap keeps the
+invoice-by-invoice MATCH/DIFF evaluation unchanged.
 
 **Sample output.** `sample_output/` is the committed result of the provided batch (AI path).
 `output/` is regenerated and git-ignored on every run. `sample_output/` is what a reviewer can
@@ -96,10 +114,16 @@ StationOps (impostor pair), SecureGuard (dual approval). 11 CLEAR.
 | `batch_report.json` | systems | per-invoice decision envelopes + run block + the invoice-by-invoice oracle verdict |
 | `audit_log.jsonl` | audit | 1 `RUN_START` + 17 `INVOICE_DECIDED`: hashes, model/prompt, tokens, agreement, decisions, prose sources |
 | `ai_telemetry.jsonl` | **HITL channel** | one `ap-telemetry-v1` row per invoice with a `reviewer_feedback: null` slot for ACCEPT / REJECT / OVERRIDE |
-| `fine_tuning_dataset.jsonl` · `few_shot_bank.json` · `threshold_suggestions.json` | continuous improvement | Alpaca SFT pairs · batch-derived exemplars · cosine-threshold suggestions (never a silent config rewrite) |
+| `reviewer_feedback.jsonl` · `review_summary.md` | **human-review loop** (`--review`) | append-only journal of reviewer actions, re-applied on every run — newest event per invoice wins · a markdown digest of the review (FIRST RUN / FEEDBACK RECEIVED / FINAL RESULT) |
+| `fine_tuning_dataset.jsonl` · `few_shot_bank.json` · `threshold_suggestions.json` | continuous improvement | Alpaca SFT pairs · batch-derived exemplars · cosine-threshold suggestions reflecting the reviewer journal (never a silent config rewrite) |
 
 CSVs are UTF-8 **with BOM** so `QuickFix OÜ`, `PolyClean Sp.z.o.o.` and `€/£` open correctly in
 Excel on Windows. `summary.md`, `report.html` and the JSON/JSONL artefacts are plain UTF-8.
+
+**Reviewer actions never alter the first-run machine artefacts** — the six files
+(`invoices_processed.csv` … `audit_log.jsonl`) stay exactly as the machine issued them; the replay
+lives in `reviewer_feedback.jsonl` and `review_summary.md`, and `threshold_suggestions.json`
+reflects the journal.
 
 ## 5. Key decisions (deliberate, named)
 
@@ -170,7 +194,7 @@ all outputs, all thresholds. `python run.py --no-ai` runs the entire chain with 
 |---|---|---|
 | LLM runtime | **Ollama** · `llama3.2:3b` · temperature 0 · JSON-schema-constrained | fully local, no API key, free |
 | PDF text | **PyMuPDF (fitz)** | parses these malformed PDFs cleanly (page-wrapped totals included) |
-| Tests | **pytest** | 144 offline tests; the oracle doubles as the golden fixture |
+| Tests | **pytest** | 171 offline tests; the oracle doubles as the golden fixture |
 | Similarity | stdlib `char4gram-cosine` (default) · `sentence-transformers` opt-in | zero heavy deps on the core path; the assignment's reference embeddings remain an upgrade, not a requirement |
 | Everything else | Python stdlib | `csv` · `difflib` · `decimal` (money is never float) · `urllib` (Ollama over stdlib HTTP) · `hashlib` |
 
@@ -178,10 +202,10 @@ all outputs, all thresholds. `python run.py --no-ai` runs the entire chain with 
 
 | Path | Role |
 |---|---|
-| `run.py` | the pipeline, S1–S11, one command |
+| `run.py` | the pipeline, S1–S11 + the `--review` terminal review, one command |
 | `src/` | one module per owned link/rule (`DEVELOPMENT_PLAN.md` §3 maps file → step) |
 | `config/` | committed config: thresholds, FX rates, **the oracle**, few-shot seed |
-| `tests/` | 144 offline tests |
+| `tests/` | 171 offline tests |
 | `RUN_LOG.md` | **measured results at consumption** — the only place numbers live |
 | `DEVELOPMENT_PLAN.md` | plan of record + status log (SPEC → PLAN → BUILD → TEST → REVIEW → SHIP) |
 | `sample_output/` | the committed result of the provided batch |

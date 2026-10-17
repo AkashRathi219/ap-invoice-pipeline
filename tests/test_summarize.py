@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from src import summarize
 from src.decide import decide_all
 from src.decide import HOLD  # noqa: F401  (used in test asserts)
 from src.summarize import (
@@ -189,4 +190,120 @@ def test_counterparty_references_historic_duplicate(tmp_path):
     path = write_exceptions_csv([record], tmp_path / "exceptions.csv")
     row = list(csv.DictReader(path.open(encoding="utf-8-sig")))[0]
     assert row["counterparty"] == "Historic INV-2024-99999 (PAID)"
+
+
+def test_counterparty_of_matches_private():
+    plain = _record({"R1": "pass", "R2": "pass", "R3": "pass",
+                     "R4": "pass", "R6": "pass"})
+    impostor = _record({"R5a": {"status": "flag", "reason_code": "R5a_clone_package"}},
+                       invoice_number="INV-2025-03760", vendor_name="StationOps GmbH",
+                       duplicates={"within_batch": [], "impostor_verdicts": [
+                           {"counterparty_invoice": "INV-2025-03955",
+                            "counterparty_vendor": "LogiTrans Express SRL",
+                            "verdict": {"risk_level": "CRITICAL", "source": "llm"}}]})
+    clone = _record({"R5a": {"status": "flag", "reason_code": "R5a_clone_package"}},
+                    invoice_number="INV-2025-03760", vendor_name="StationOps GmbH",
+                    duplicates={"within_batch": [{"a_invoice": "INV-2025-03760",
+                                                  "b_invoice": "INV-2025-03955",
+                                                  "a_vendor": "StationOps GmbH",
+                                                  "b_vendor": "LogiTrans Express SRL",
+                                                  "description_cosine": 1.0,
+                                                  "quantity_match": 1.0,
+                                                  "unit_price_ratio": 0.692,
+                                                  "pattern": "CLONE_PACKAGE_BLOCKED_VENDOR",
+                                                  "flagged": True,
+                                                  "embedding_backend": "char4gram-cosine"}],
+                               "impostor_verdicts": []})
+    historic = _record({
+        "R5b": {"status": HOLD, "reason_code": "R5b_exact_duplicate"},
+    })
+    historic["duplicates"] = {
+        "vs_historic": {
+            "exact_matches": [{"invoice_id": "INV-2024-99999", "status": "PAID"}],
+            "near_matches": [],
+        }
+    }
+    records = [plain, impostor, clone, historic]
+    decide_all(records, llm_cfg=None)
+    assert [summarize.counterparty_of(r) for r in records] == [
+        "",
+        "INV-2025-03955 (LogiTrans Express SRL)",  # impostor verdict wins
+        "INV-2025-03955 (LogiTrans Express SRL)",  # flagged within-batch pair (b side)
+        "Historic INV-2024-99999 (PAID)",
+    ]
+    for record in records:  # the public delegate mirrors the private helper on every branch
+        assert summarize.counterparty_of(record) == summarize._counterparty(record)
+
+
+# ------------------------------------------------------------------ oracle scoping (R5, R6)
+
+def _foreign_batch():
+    """Three generic invoices whose numbers share nothing with the committed fixture."""
+    records = []
+    for i in range(1, 4):
+        invoice_number = f"INV-CUSTOM-{i:04d}"
+        record = _record({"R1": "pass", "R2": "pass", "R3": "pass",
+                          "R4": "pass", "R6": "pass"},
+                         invoice_number=invoice_number, vendor_name=f"Custom Vendor {i}")
+        record["source_file"] = f"{invoice_number}.pdf"
+        record["currency"] = "EUR"
+        record["total"] = record["total_trusted"] = "500.00"
+        record["fx"] = {"amount_eur": "500.00", "rate_to_eur": 1.0, "as_of": "2025-11-30"}
+        record["vendor_match"] = {"status": "exact", "vendor_id": f"V90{i}"}
+        record["vendor_master"] = {"status": "ACTIVE", "spend_threshold_eur": "20000"}
+        record["vendor_country"] = "Germany"
+        record["verification"] = {"agreement_score": "9/9", "line_math_ok": True,
+                                  "total_status": "clean"}
+        record["duplicates"] = {"vs_historic": {"status": "skip"}, "within_batch": [],
+                                "impostor_verdicts": []}
+        records.append(record)
+    decide_all(records, llm_cfg=None)
+    return records
+
+
+def test_fully_foreign_batch_is_scoped_to_na():
+    result = verify_oracle(_foreign_batch(), ORACLE)
+    assert result["applicable"] is False
+    assert result["status"] == "N/A"
+    assert result["ok"] is True
+    assert result["mismatches"] == []
+    assert result["missing_invoices"] == []
+
+
+def test_foreign_batch_artefacts_render_na(tmp_path):
+    meta = {"generated_at": "2026-10-17T09:00:00Z", "model": "llama3.2:3b",
+            "prompt_version": "ap-extract-v1", "temperature": 0.0,
+            "backend": "char4gram-cosine", "ai_available": False,
+            "control": {"found": 3, "expected": 3, "processed": 3}}
+    result = build_outputs(_foreign_batch(), meta, tmp_path)
+    assert result["oracle"]["ok"] and result["oracle"]["status"] == "N/A"
+    report = json.loads((tmp_path / "batch_report.json").read_text(encoding="utf-8"))
+    assert report["oracle"]["status"] == "N/A"
+    summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
+    assert "Oracle §5.3 check:** N/A (custom dataset)" in summary
+    assert "DIFF" not in summary and "INV-2025-" not in summary  # no mismatch/missing leak
+    html_report = (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert "ORACLE N/A — custom dataset" in html_report
+    assert "DIFF" not in html_report and "{{" not in html_report
+    assert "INV-2025-" not in html_report
+
+
+def test_17_record_batch_still_reports_match(batch, tmp_path):
+    result = verify_oracle(batch, ORACLE)
+    assert result["ok"] is True
+    assert result["status"] == "MATCH"
+    assert result["applicable"] is True
+    assert result["mismatches"] == [] and result["missing_invoices"] == []
+
+    meta = {"generated_at": "2026-10-17T08:00:00Z", "model": "llama3.2:3b",
+            "prompt_version": "ap-extract-v1", "temperature": 0.0,
+            "backend": "char4gram-cosine", "ai_available": True,
+            "control": {"found": 17, "expected": 17, "processed": 17}}
+    build_outputs(batch, meta, tmp_path)
+    audit_lines = (tmp_path / "audit_log.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(audit_lines) == 18  # 1 run header + 17 invoice events
+    summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
+    assert "17 invoices were read" in summary
+    assert "Oracle §5.3 check:** MATCH" in summary
+    assert "ORACLE MATCH" in (tmp_path / "report.html").read_text(encoding="utf-8")
 

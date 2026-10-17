@@ -1,7 +1,7 @@
 """S2 — Ingest: hash, land, control record. Assets are consumed here and only here.
 
 Deterministic by nature (I/O, not intelligence). The control record is the pipeline's
-first fail-safe (P-E01): wrong file count aborts the run before any AI call is made.
+first fail-safe (P-E01): a pinned count mismatch aborts the run before any AI call is made.
 """
 from __future__ import annotations
 
@@ -25,11 +25,17 @@ class ControlRecord:
     expected: int
     found: int
     files: tuple[InvoiceFile, ...]
+    pinned: bool = True
 
     @property
     def ok(self) -> bool:
         """Returns True if the number of discovered files matches the expected count."""
         return self.found == self.expected
+
+    @property
+    def mode(self) -> str:
+        """Names the active truncation control mode: strict when pinned, auto-detect otherwise."""
+        return "strict" if self.pinned else "auto-detect"
 
     @property
     def duplicate_hashes(self) -> list[str]:
@@ -62,12 +68,13 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def ingest(invoices_dir: Path, expected: int) -> ControlRecord:
+def ingest(invoices_dir: Path, expected: int | None = None) -> ControlRecord:
     """Discovers all PDF invoices in the input folder and constructs the control record gate.
 
     Args:
         invoices_dir: Directory containing input invoice PDFs.
-        expected: Expected number of PDFs from pipeline config.
+        expected: Expected number of PDFs from pipeline config. None/absent/0 auto-detects
+            the batch size (no truncation control); a positive integer pins a strict count gate.
 
     Returns:
         ControlRecord instance containing file metadata and validation flags.
@@ -83,4 +90,6 @@ def ingest(invoices_dir: Path, expected: int) -> ControlRecord:
         raise FileNotFoundError(f"invoices directory not found: {invoices_dir}")
     pdfs = sorted(invoices_dir.glob("*.pdf"), key=lambda p: p.name)
     files = tuple(InvoiceFile(p.name, sha256_of(p), p.stat().st_size) for p in pdfs)
+    if expected is None or expected < 1:
+        return ControlRecord(str(invoices_dir), len(files), len(files), files, pinned=False)
     return ControlRecord(str(invoices_dir), expected, len(files), files)

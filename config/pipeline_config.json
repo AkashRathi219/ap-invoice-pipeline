@@ -1,8 +1,8 @@
 {
   "_comment_overview": "Pipeline Configuration: Central control parameters, tolerances, and model configurations for AP Intelligent Processing Pipeline.",
   
-  "_comment_expected_invoice_count": "Expected batch size. Ingest gate (src/ingest.py) verifies exact count matches before processing.",
-  "expected_invoice_count": 17,
+  "_comment_expected_invoice_count": "Ingest count gate (src/ingest.py). null/absent = auto-detect (no truncation control): the batch size is derived from the PDFs found. positive integer = strict count gate (exit 1 on mismatch): the gate verifies exact count matches before processing.",
+  "expected_invoice_count": null,
   
   "_comment_llm": "Local LLM settings for Ollama runtime used across extraction (src/extract_ai.py), forensic impostor analysis (src/duplicates.py), and plain-language reasoning (src/enrich.py, src/decide.py).",
   "llm": {

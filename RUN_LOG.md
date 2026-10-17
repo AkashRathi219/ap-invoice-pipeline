@@ -291,7 +291,7 @@ HOLD 3** — identical to the run above, with only latency differing.
 
 ---
 
-# B4 � Decide (S10) � Outputs (S11) � Feedback loops (A5) � measured
+# B4 � Decide (S10) � Outputs (S11) � Feedback loops (A5) � measured
 
 ```text
 python run.py                          # full AI batch, measured below
@@ -299,30 +299,30 @@ python run.py --no-ai                  # deterministic cross-check, measured bel
 python run.py --out-dir sample_output  # same artefacts, anywhere on disk
 ```
 
-## S10 � one decision object per invoice
+## S10 � one decision object per invoice
 
 Every tell folds into one structured decision (`record["decision"]`), computed by
-`decide.decide_record` from the rule results alone � it re-derives the disposition rather than
+`decide.decide_record` from the rule results alone � it re-derives the disposition rather than
 trusting a precomputed key, so a bare tell-set (the oracle fixture) grades identically to a full
 batch record.
 
 | Field | Measured example (AI run) |
 |---|---|
 | `disposition` / `queue` | `HOLD` / `HELD` (OldGuard), `FLAG-REVIEW` / `REVIEW_QUEUE` (CleanStation) |
-| `reason_codes` | `R1_inactive_vendor; R5a_clone_package` � verbatim from the rule layer |
+| `reason_codes` | `R1_inactive_vendor; R5a_clone_package` � verbatim from the rule layer |
 | `decision_reasons` | plain-language per blocker (R1 detail + R5a clone evidence) |
-| `risk_level` | `CRITICAL` � gate verdict; a `HOLD` without a clone grades `HIGH` |
-| `variant_tells` | `V1` format B / regex fallback � `V3` wrapped-or-disputed total � `V5` duplicate evidence � `V6` disposition class |
-| `next_action` | from `ACTION_BY_REASON` � deterministic even when the model garbled prose (B3 finding) |
+| `risk_level` | `CRITICAL` � gate verdict; a `HOLD` without a clone grades `HIGH` |
+| `variant_tells` | `V1` format B / regex fallback � `V3` wrapped-or-disputed total � `V5` duplicate evidence � `V6` disposition class |
+| `next_action` | from `ACTION_BY_REASON` � deterministic even when the model garbled prose (B3 finding) |
 | `rationale` (A4) | LLM paragraph (`ap-decide-v1`) when Ollama reachable; template otherwise |
 
 **A4 measured:** all 6 non-CLEAR invoices carried an `ap-decide-v1` paragraph on the AI run
 (`source: llm`), and the template fallback covers every non-CLEAR invoice with `llm_cfg=None`
 (tests). One honest tell: for CleanStation the model paraphrased the evidence as "raises impostor
-risk" although no impostor verdict exists on that invoice � the paragraph is a draft for a human,
+risk" although no impostor verdict exists on that invoice � the paragraph is a draft for a human,
 and the disposition/reason codes it rides on are unaffected.
 
-## S11 � reviewer-facing artefacts (git-ignored `output/`, regenerated every run)
+## S11 � reviewer-facing artefacts (git-ignored `output/`, regenerated every run)
 
 | Artefact | Shape | Measured |
 |---|---|---|
@@ -333,36 +333,36 @@ and the disposition/reason codes it rides on are unaffected.
 | `audit_log.jsonl` | 1 `RUN_START` + 17 `INVOICE_DECIDED` events: sha256, model/prompt, tokens, agreement, decision, prose sources | 18 lines |
 | `report.html` | self-contained, no CDN, from `src/report_template.html` | oracle badge + exception queue + evidence + AI usage |
 
-CSVs are written UTF-8 **with BOM** (`utf-8-sig`) so vendor names (O�, Sp.z.o.o.) and `�/�` open
+CSVs are written UTF-8 **with BOM** (`utf-8-sig`) so vendor names (O�, Sp.z.o.o.) and `�/�` open
 correctly in Excel on Windows; `summary.md`, `report.html` and all JSON/JSONL are plain UTF-8.
 
-## The �5.3 oracle as a golden-file test � both paths
+## The �5.3 oracle as a golden-file test � both paths
 
 The committed fixture `config/oracle_dispositions.json` states, per invoice, the rule outcomes that
 must produce the expected disposition.
 
 | Path | Dispositions | Oracle verdict |
 |---|---|---|
-| `python run.py` (AI primary) | **CLEAR 11 � FLAG-REVIEW 3 � HOLD 3** | **MATCH** � invoice-by-invoice |
-| `python run.py --no-ai` (regex fallback) | CLEAR 12 � FLAG-REVIEW 2 � HOLD 3 | DIFF � CleanStation clears (regex reads all totals) |
+| `python run.py` (AI primary) | **CLEAR 11 � FLAG-REVIEW 3 � HOLD 3** | **MATCH** � invoice-by-invoice |
+| `python run.py --no-ai` (regex fallback) | CLEAR 12 � FLAG-REVIEW 2 � HOLD 3 | DIFF � CleanStation clears (regex reads all totals) |
 
 The `--no-ai` DIFF is the documented regex-path expectation (B2/B3 finding), not a regression: the
 oracle grades the AI-primary path, where the wrapped CleanStation total refuses verification. The
 same fixture is also driven **offline** by `tests/test_decide.py` + `tests/test_summarize.py`
-(17 invoice-level golden tests + a full `verify_oracle` run) � the ladder is testable without any
+(17 invoice-level golden tests + a full `verify_oracle` run) � the ladder is testable without any
 invoice data or LLM.
 
-## Feedback loops (A5) � measured on the AI run
+## Feedback loops (A5) � measured on the AI run
 
 | Artefact | Measured | Note |
 |---|---|---|
 | `output/ai_telemetry.jsonl` | 17 rows, `ap-telemetry-v1` | now carries queue, risk, variant ids, `message_source`, `rationale_source`, `vendor_category`, `reviewer_feedback: null` (the HITL slot) |
-| `output/threshold_suggestions.json` | baseline 0.85 retained, 0 rejected flags | neutral without reviewer feedback; a REJECT of a flagged impostor raises that category's suggestion by +0.05 (cap 0.95) � a suggestion file, **never** a config rewrite |
-| `output/few_shot_bank.json` | 6 exemplars (1 IMPOSTOR_CLONE � HOLD � FLAG_REVIEW) | batch-derived; the committed **seed** stays at `config/few_shot_bank.json` so a fresh clone keeps a clean tree |
+| `output/threshold_suggestions.json` | baseline 0.85 retained, 0 rejected flags | neutral without reviewer feedback; a REJECT of a flagged impostor raises that category's suggestion by +0.05 (cap 0.95) � a suggestion file, **never** a config rewrite |
+| `output/few_shot_bank.json` | 6 exemplars (1 IMPOSTOR_CLONE � HOLD � FLAG_REVIEW) | batch-derived; the committed **seed** stays at `config/few_shot_bank.json` so a fresh clone keeps a clean tree |
 | `output/fine_tuning_dataset.jsonl` | 10 Alpaca pairs (6 AP_DISPOSITION_REVIEW + 4 IMPOSTOR_ASSESSMENT) | ready for local LoRA SFT; no cloud cost |
 
 Reviewer actions are appendable offline: `feedback.record_feedback(path, events)` validates
-ACCEPT / REJECT / OVERRIDE and `read_feedback` replays them � no invoice data and no network.
+ACCEPT / REJECT / OVERRIDE and `read_feedback` replays them � no invoice data and no network.
 
 ## Tests
 
@@ -370,8 +370,10 @@ ACCEPT / REJECT / OVERRIDE and `read_feedback` replays them � no invoice data an
 python -m pytest -q        # 144 passed (88 existing + 56 new)
 ```
 
+Baseline note (B5): the suite now measures **156 passed** — the 144 above is the B4-era count, kept verbatim.
+
 56 new offline tests: the golden-file oracle (17 invoice-level + full-set `verify_oracle`), ladder
-ownership (HOLD > FLAG-REVIEW > CLEAR, queue mapping, next actions), variant tells V1�V6, gate-owned
+ownership (HOLD > FLAG-REVIEW > CLEAR, queue mapping, next actions), variant tells V1�V6, gate-owned
 risk level, A4 rationale fallback + verbatim reason codes in the prompt, artefact writers
 (CSV cells, audit shape, rendered HTML has no unrendered tokens), feedback loop A/B/C including the
 REJECT-driven threshold suggestion, and `decision_of` never mutating a record.
@@ -379,6 +381,161 @@ REJECT-driven threshold suggestion, and `decision_of` never mutating a record.
 ## Noted environment variance
 
 Mean extraction latency on the measurement run was **4,876 ms/invoice** (B3 repeat runs 5,017 /
-5,086 ms � same model and prompt). The decision layer itself adds **6 `ap-decide-v1` calls**
-(� 4�6 s total) on the AI path and **zero** on `--no-ai`. Latency is quoted as measured, never as
+5,086 ms � same model and prompt). The decision layer itself adds **6 `ap-decide-v1` calls**
+(� 4�6 s total) on the AI path and **zero** on `--no-ai`. Latency is quoted as measured, never as
 a specification.
+
+---
+
+# B5 — Human review (--review) · Loop A journal replay — measured
+
+New module: `src/review.py`. Changed: `run.py` (the `--review` flag) · `src/summarize.py`
+(`counterparty_of` made public as a named alias). New tests: `tests/test_review.py` (10).
+
+```text
+python run.py --review     # full batch, then the interactive terminal review over the non-CLEAR queue
+```
+
+## The loop
+
+| Item | Measured |
+|---|---|
+| Entry | after the batch, an interactive terminal review screen over the non-CLEAR exception queue, worst risk first |
+| Actions | ACCEPT · REJECT · OVERRIDE (to a chosen disposition; an invalid target is re-asked in place, the menu never advances) · SKIP · QUIT |
+| Terminal guardrail | the menu opens only when `--review` is passed **and** `sys.stdin.isatty()`; in a pipe or CI the run prints a notice containing `not an interactive terminal` and exits 0 |
+| Journal | `output/reviewer_feedback.jsonl` — append-only, written through `feedback.record_feedback` (schema-validated) |
+| Replay | the journal is auto-loaded and re-applied on **every** run — newest event per invoice wins (ACCEPT then REJECT → REJECT; REJECT then ACCEPT → the machine disposition stands again) |
+| REJECT | sets that invoice's **final disposition to CLEAR** — while `machine_disposition` and the records themselves are never mutated |
+
+## Artefacts
+
+| File | For | Measured |
+|---|---|---|
+| `output/reviewer_feedback.jsonl` | audit | one event per action: `ts` · `invoice_id` · `action` · `note` · `override_disposition` |
+| `output/review_summary.md` | the reviewer | three parts: **FIRST RUN** (machine dispositions) · **FEEDBACK RECEIVED** (journal actions) · **FINAL RESULT** (post-replay dispositions) |
+| `output/threshold_suggestions.json` | Loop A | reflects the journal — a REJECT of a flagged impostor raises its vendor category's suggestion by +0.05 (measured 0.85 → 0.90 on "Station Operations"), still never a config rewrite |
+
+The six machine artefacts (`invoices_processed.csv` … `audit_log.jsonl`) are exactly what the
+machine issued on the first pass — reviewer actions journal, digest and suggest; they never fold
+back into them.
+
+## Tests
+
+```
+python -m pytest -q        # 156 passed
+```
+
+10 new offline tests (§ `tests/test_review.py`): absent-journal replay, schema-validated ACCEPT,
+REJECT → CLEAR (records never mutated), OVERRIDE validation + re-prompt, newest-event-wins across
+runs, the Loop-A suggestion from a REJECT, QUIT preserving prior actions, the three-part report,
+and the two `run.py` wirings — no `--review` never reads `stdin`, and a non-TTY `--review` prints
+the notice and exits 0. Fully offline: the menu is driven with a scripted `input_fn`, never a
+live terminal.
+
+---
+
+# B6 — Dataset-agnostic ingest (S1–S2) · oracle scoping — measured
+
+Date: 2026-10-17 · same environment as above (Python 3.13.13, PyMuPDF 1.28.0, pytest 9.1.1,
+Ollama 0.35.0 / `llama3.2:3b` temperature 0, Windows 11).
+
+Change in one line: the ingest count expectation **defaults to auto-detect**
+(`config/pipeline_config.json` → `expected_invoice_count: null`); a positive integer pins a
+strict count gate; the active mode is named on the `Control record:` line; and the §5.3 golden
+oracle is scoped — a batch sharing **no** invoice number with `config/oracle_dispositions.json`
+reports **N/A** instead of a false DIFF. Duplicate SHA-256 rejection is unchanged and fails in
+both modes. No new dependency; `src/feedback.py` untouched.
+
+## Measured — full suite
+
+```
+python -m pytest -q        # 171 passed in 8.41s   (160 pre-existing + 11 new)
+```
+
+The 11 new offline tests: 8 in `tests/test_ingest.py` (auto-detect on N≠17, strict mismatch,
+duplicate rejection in *both* modes, the committed batch pinned at 17, `run.main` auto-detect +
+N/A console line, `run.main` strict abort before extraction, `run.main` duplicate rejection in
+both modes, `run.main` empty dir → exit 2) and 3 in `tests/test_summarize.py` (fully foreign
+batch → `status "N/A"`/`ok True`, foreign-batch artefacts render the N/A strings, the
+17-record batch still reports MATCH).
+
+## Measured — `python run.py --no-ai` (committed 17-PDF batch, default config)
+
+```text
+Control record: 17/17 PDFs · unique SHA-256: yes · control mode: auto-detect (no truncation control) · dir: <repo>\solution\ap-automation-assessment\invoices
+...
+Dispositions     : CLEAR 12 · FLAG-REVIEW 2 · HOLD 3
+Oracle Status    : DIFF — measured {'CLEAR': 12, 'HOLD': 3, 'FLAG-REVIEW': 2} vs expected {'CLEAR': 11, 'FLAG-REVIEW': 3, 'HOLD': 3}
+    Mismatch -> INV-2025-03744: expected FLAG-REVIEW, measured CLEAR
+```
+
+Exit code 0. **The `--no-ai` DIFF is pre-existing and not a regression**: it is the documented
+regex-path expectation from B2/B3 (the regex second read verifies all totals, so CleanStation
+clears — CLEAR 12 / FLAG-REVIEW 2 / HOLD 3), unchanged by this iteration. The measured mismatch
+line is identical to the B4-era one.
+
+## Measured — `python run.py` (AI primary, committed 17-PDF batch)
+
+```text
+Control record: 17/17 PDFs · unique SHA-256: yes · control mode: auto-detect (no truncation control) · dir: <repo>\solution\ap-automation-assessment\invoices
+...
+Records Ingested : 17 | Verified Totals: 14/17 | Within-Batch Pairs: 9 (2 flagged)
+Dispositions     : CLEAR 11 · FLAG-REVIEW 3 · HOLD 3
+Oracle Status    : MATCH (CLEAR 11 · FLAG-REVIEW 3 · HOLD 3)
+```
+
+Exit code 0. Identical dispositions and oracle verdict to the B3/B4 golden runs; `batch_report.json`
+→ `run.control_record` measured `found 17 / expected 17 / processed 17`, `oracle.applicable true`,
+`oracle.status "MATCH"`, `audit_log.jsonl` measured 18 lines (1 `RUN_START` + 17
+`INVOICE_DECIDED`). The only additive schema anywhere is `oracle.applicable`/`oracle.status`
+inside `batch_report.json`, as sanctioned by the spec.
+
+## Measured — a 5-PDF batch, no config edit
+
+A temp copy of the dataset with the first 5 committed PDFs plus both CSVs
+(`C:\Users\admin\AppData\Local\Temp\opencode\dataset5`), run with **no config change**:
+
+```text
+python run.py --no-ai --data-dir C:\Users\admin\AppData\Local\Temp\opencode\dataset5 --out-dir C:\Users\admin\AppData\Local\Temp\opencode\dataset5\out
+
+Control record: 5/5 PDFs · unique SHA-256: yes · control mode: auto-detect (no truncation control) · dir: C:\Users\admin\AppData\Local\Temp\opencode\dataset5\invoices
+```
+
+Exit code 0; **11 artefact files** written to the out-dir (the 10 console-listed files plus
+`extraction_records.json`). This 5-PDF set is a *slice* of the assessment batch, so its invoice
+numbers DO overlap the oracle fixture and the oracle evaluates as a partial batch
+(`measured {'CLEAR': 5}` vs the expected totals, with the `Not processed:` list) — that is the
+correct R6 behaviour, not the N/A case. The **N/A** path applies to a batch sharing zero invoice
+numbers with the fixture; the as-built console line for that case is
+
+```text
+Oracle Status    : N/A — custom dataset (no overlap with the §5.3 assessment set)
+```
+
+asserted offline by `tests/test_ingest.py::test_run_main_auto_detect_runs_a_small_batch_and_scopes_oracle_to_na`
+(no `Mismatch ->` / `Not processed:` lines on a disjoint batch), with the artefact renderings
+`Oracle §5.3 check:** N/A (custom dataset)` in `summary.md` and
+`ORACLE N/A — custom dataset` in `report.html` asserted by
+`tests/test_summarize.py::test_foreign_batch_artefacts_render_na` and the scoping itself by
+`tests/test_summarize.py::test_fully_foreign_batch_is_scoped_to_na` — all three measured
+passing this iteration (3 passed in 0.22s).
+
+## Mode semantics (as shipped, from the config comment)
+
+| `expected_invoice_count` | Mode | Behaviour |
+|---|---|---|
+| `null` / absent / `0` | `auto-detect (no truncation control)` | batch size derived from the PDFs found; any N ≥ 1 proceeds |
+| positive integer M | `strict (expected_invoice_count=M)` | `found != M` → exit 1 **before any extraction or model call** |
+| either | — | duplicate SHA-256 hashes → exit 1 in both modes; empty dir under auto-detect → exit 2 `no PDFs found in <dir> — nothing to process` |
+
+## Tests
+
+```
+python -m pytest -q        # 171 passed (160 existing + 11 new)
+```
+
+## Noted environment variance
+
+Per-invoice AI latency was **not re-measured** this iteration (the B3/B4/B5 variance notes stand);
+the two 17-PDF runs above completed normally. Every other number on this page is quoted from the
+runs above, measured 2026-10-17.

@@ -121,6 +121,7 @@ def _evidence_text(record: dict) -> str:
 
 
 def _counterparty(record: dict) -> str:
+    # 1. Impostor / clone-package within batch (R5a)
     verdicts = (record.get("duplicates") or {}).get("impostor_verdicts") or []
     if verdicts:
         return f"{verdicts[0].get('counterparty_invoice')} ({verdicts[0].get('counterparty_vendor')})"
@@ -129,7 +130,22 @@ def _counterparty(record: dict) -> str:
     if flagged:
         pair = flagged[0]
         invoice = record.get("invoice_number")
-        return pair["b_invoice"] if pair["a_invoice"] == invoice else pair["a_invoice"]
+        counter_inv = pair["b_invoice"] if pair["a_invoice"] == invoice else pair["a_invoice"]
+        counter_vnd = pair["b_vendor"] if pair["a_invoice"] == invoice else pair["a_vendor"]
+        return f"{counter_inv} ({counter_vnd})"
+    
+    # 2. Historic duplicates (R5b exact or near-duplicate)
+    historic = (record.get("duplicates") or {}).get("vs_historic") or {}
+    exact_matches = historic.get("exact_matches") or []
+    if exact_matches:
+        first = exact_matches[0]
+        return f"Historic {first.get('invoice_id')} ({first.get('status')})"
+    near_matches = historic.get("near_matches") or []
+    flagged_near = [m for m in near_matches if m.get("within_tolerance") and m.get("within_window")]
+    if flagged_near:
+        worst = flagged_near[0]
+        return f"Historic {worst.get('invoice_id')} ({worst.get('status')}, Δ{worst.get('amount_delta_pct')}%, {worst.get('date_gap_days')}d)"
+
     return ""
 
 

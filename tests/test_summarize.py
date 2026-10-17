@@ -173,3 +173,20 @@ def test_decision_of_computes_when_s10_was_not_run():
     assert disposition_of(record) == "HOLD"
     assert decision_of(record)["disposition"] == "HOLD"
     assert record.get("decision") is None  # decision_of never mutates the record
+
+
+def test_counterparty_references_historic_duplicate(tmp_path):
+    record = _record({
+        "R5b": {"status": HOLD, "reason_code": "R5b_exact_duplicate"},
+    })
+    record["duplicates"] = {
+        "vs_historic": {
+            "exact_matches": [{"invoice_id": "INV-2024-99999", "status": "PAID"}],
+            "near_matches": [],
+        }
+    }
+    decide_all([record], llm_cfg=None)
+    path = write_exceptions_csv([record], tmp_path / "exceptions.csv")
+    row = list(csv.DictReader(path.open(encoding="utf-8-sig")))[0]
+    assert row["counterparty"] == "Historic INV-2024-99999 (PAID)"
+

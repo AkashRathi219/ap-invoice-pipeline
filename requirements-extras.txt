@@ -1,3 +1,4 @@
-# B3 semantic layer (within-batch impostor detection) — opt-in, heavy wheels
+# B3 semantic layer (within-batch impostor detection) — opt-in, heavy wheels.
+# The core default backend is `char4gram-cosine` (dependency-free, measured) — this file
+# is ONLY for upgrading to real model embeddings; nothing in the pipeline requires it.
 sentence-transformers>=3.0
-faiss-cpu>=1.8

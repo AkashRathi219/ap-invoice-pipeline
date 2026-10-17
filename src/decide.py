@@ -64,11 +64,7 @@ def _variant(template: dict, *, error_observed: str, severity: str, tolerance) -
 
 
 def _disposition_of(record: dict) -> str:
-    """Compute the disposition from the rule results — never trust a precomputed key.
-
-    `run.py` keeps `rules["disposition"]` fresh, but the decide layer must be able to grade a
-    bare tell-set (the oracle fixture does exactly that), so it re-derives from the results.
-    """
+    """Computes final disposition from rule results, ensuring idempotency and robustness."""
     disposition = (record.get("rules") or {}).get("disposition")
     if disposition in (CLEAR, FLAG_REVIEW, HOLD):
         return disposition
@@ -76,7 +72,11 @@ def _disposition_of(record: dict) -> str:
 
 
 def variant_tells(record: dict) -> list[dict]:
-    """One F10 tag per error observed on this invoice (deterministic, never AI-authored)."""
+    """Generates standardized F10 variant tags (V1–V6) for any anomalies observed on an invoice.
+
+    Where called:
+        Called inside decide_record() to enrich the decision object.
+    """
     tells: list[dict] = []
     verification = record.get("verification") or {}
     vendor_match = record.get("vendor_match") or {}
@@ -148,7 +148,7 @@ def _risk_level(record: dict) -> str | None:
 
 
 def why_text(result: dict) -> str:
-    """Plain-language 'why' for one rule result (detail text is already human-readable)."""
+    """Formats human-readable explanation string for an individual rule blocker."""
     code = result.get("reason_code")
     detail = str(result.get("detail") or "").strip()
     if code and detail:
@@ -157,7 +157,7 @@ def why_text(result: dict) -> str:
 
 
 def decision_reasons(record: dict, disposition: str | None = None) -> list[str]:
-    """Human-readable 'why' strings — one per blocker, deterministic."""
+    """Generates list of deterministic plain-language reason strings explaining the disposition."""
     disposition = disposition or _disposition_of(record)
     results = (record.get("rules") or {}).get("results") or []
     active = [r for r in results if r.get("status") in ("flag", HOLD)]
@@ -167,6 +167,7 @@ def decision_reasons(record: dict, disposition: str | None = None) -> list[str]:
 
 
 def next_action_for(reason_codes: list[str]) -> str | None:
+    """Selects highest priority remediation action code for non-CLEAR invoices."""
     for code in reason_codes:
         if code in ACTION_BY_REASON:
             return ACTION_BY_REASON[code]
@@ -176,7 +177,7 @@ def next_action_for(reason_codes: list[str]) -> str | None:
 # --------------------------------------------------------------------------------- evidence
 
 def evidence_summary(record: dict) -> dict:
-    """Scored proof rolled up for the CSV / HTML: what the decision actually rests on."""
+    """Collates all numeric, cryptographic, and categorical evidence backing the decision."""
     vendor_match = record.get("vendor_match") or {}
     verification = record.get("verification") or {}
     duplicate_block = record.get("duplicates") or {}
@@ -219,7 +220,17 @@ def evidence_summary(record: dict) -> dict:
 # --------------------------------------------------------------------------------- decide
 
 def decide_record(record: dict, llm_cfg: dict | None = None) -> dict:
-    """Fold every tell into one decision object (idempotent; attaches nothing to the record)."""
+    """Synthesises all upstream signals into one canonical decision object.
+
+    Assigns disposition (CLEAR, FLAG-REVIEW, HOLD), destination queue (APPROVER_QUEUE,
+    REVIEW_QUEUE, HELD), blockers, next action, and reviewer rationale.
+
+    Where called:
+        Called inside decide_all().
+
+    Where it sends information:
+        Saved onto the record under the 'decision' key.
+    """
     results = (record.get("rules") or {}).get("results") or []
     disposition = _rules.disposition(results)
     reason_codes = _rules.reason_codes(results)
@@ -247,7 +258,14 @@ def decide_record(record: dict, llm_cfg: dict | None = None) -> dict:
 
 
 def decide_all(records: list[dict], llm_cfg: dict | None = None) -> list[dict]:
-    """Attach a `decision` block to every record; returns the records (convenience)."""
+    """Iterates across all records in the batch, attaching a decision object to each.
+
+    Where called:
+        Called by run.py at Step S10 in Pass 2.
+
+    Where it sends information:
+        Populates record['decision'] across the batch, consumed by summarize.py to build reports.
+    """
     for record in records:
         record["decision"] = decide_record(record, llm_cfg)
     return records
@@ -291,7 +309,7 @@ def _rationale_prompt(record: dict) -> str:
 
 
 def template_rationale(record: dict) -> str:
-    """Deterministic fallback paragraph — always available, never AI-dependent."""
+    """Generates deterministic baseline rationale text when local LLM is offline or disabled."""
     disposition = _disposition_of(record)
     reasons = decision_reasons(record, disposition)
     action = next_action_for(_rules.reason_codes((record.get("rules") or {}).get("results") or []))
@@ -305,10 +323,16 @@ def template_rationale(record: dict) -> str:
 
 
 def reviewer_rationale(record: dict, decision: dict, llm_cfg: dict | None = None) -> dict:
-    """A4 — plain-language reviewer summary. LLM prose when reachable, template otherwise.
+    """Generates concise explanatory narrative for human reviewer via LLM or template fallback.
 
-    Read-only and post-decision: the disposition is already fixed by the ladder. The `source`
-    field names which path produced the prose.
+    Note:
+        Strictly read-only and executed post-decision: the LLM cannot alter the disposition.
+
+    Where called:
+        Called inside decide_record() for non-CLEAR invoices.
+
+    Where it sends information:
+        Saved into record['decision']['rationale'], visible in summary.md and report.html.
     """
     fallback = {
         "source": "template",

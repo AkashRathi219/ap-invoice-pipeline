@@ -21,7 +21,20 @@ DEFAULT_RATES_PATH = Path(__file__).resolve().parents[1] / "config" / "fx_rates.
 
 
 def load_fx_table(path: Path = DEFAULT_RATES_PATH) -> dict[str, Decimal]:
-    """Read the committed FX config file -> ``{ISO currency: rate_to_eur}``."""
+    """Reads the static committed FX rates table from config/fx_rates.csv.
+
+    Args:
+        path: Path to the fx_rates.csv configuration file.
+
+    Returns:
+        Dict mapping ISO currency strings to Decimal conversion rates to EUR (e.g. {'GBP': Decimal('1.1719')}).
+
+    Where called:
+        Called by run.py at initialization, and by tests/test_fx.py.
+
+    Where it sends information:
+        Supplies fx_table to to_eur() for normalising foreign currency invoices.
+    """
     table: dict[str, Decimal] = {}
     text = Path(path).read_text(encoding="utf-8", errors="replace")
     lines = []
@@ -52,7 +65,20 @@ def load_fx_table(path: Path = DEFAULT_RATES_PATH) -> dict[str, Decimal]:
 
 
 def fx_as_of(path: Path = DEFAULT_RATES_PATH) -> str:
-    """Return the committed as-of date of the FX table (latest row wins)."""
+    """Retrieves the latest committed as-of audit date recorded in fx_rates.csv.
+
+    Args:
+        path: Path to fx_rates.csv.
+
+    Returns:
+        ISO date string representing the effective date of the FX rates.
+
+    Where called:
+        Called by run.py at startup to attach audit timestamps to currency evidence.
+
+    Where it sends information:
+        Recorded in the 'fx' block of each invoice record and printed in output reports.
+    """
     as_of = ""
     text = Path(path).read_text(encoding="utf-8", errors="replace")
     lines = []
@@ -74,12 +100,26 @@ def fx_as_of(path: Path = DEFAULT_RATES_PATH) -> str:
 
 
 def to_eur(amount, currency, fx_table: dict[str, Decimal], as_of: str | None = None) -> tuple[Decimal | None, dict]:
-    """Convert ``amount`` of ``currency`` into EUR.
+    """Converts a monetary amount from its native currency into EUR using the static rate table.
 
-    Returns ``(amount_eur, evidence)``. ``amount_eur`` is ``None`` when the
-    amount or the currency is missing, or when the currency has no committed
-    rate — in which case ``evidence['fx_known']`` is ``False`` and the caller
-    must treat the invoice as not-yet-clearable instead of guessing.
+    Implements fail-closed conversion: if the currency is unrecognized or missing a committed rate,
+    returns amount_eur=None and fx_known=False. The pipeline refuses to guess exchange rates.
+
+    Args:
+        amount: Raw or trusted numeric amount.
+        currency: ISO currency code (EUR, GBP, etc.).
+        fx_table: Conversion table from load_fx_table().
+        as_of: Audit effective date.
+
+    Returns:
+        Tuple of (converted_amount_eur, evidence_dict).
+
+    Where called:
+        Called by run.py in Pass 1 after arithmetic verification.
+
+    Where it sends information:
+        Populates record['fx']. amount_eur is passed directly to rules.py (run_rules())
+        for R3 spend threshold evaluation, and to duplicates.py (check_historic()) for R5b.
     """
     currency_code = str(currency).strip().upper() if currency is not None else "EUR"
     if not currency_code:
@@ -107,6 +147,7 @@ def to_eur(amount, currency, fx_table: dict[str, Decimal], as_of: str | None = N
 
 
 def _as_decimal(value) -> Decimal | None:
+    """Helper to ensure currency values are converted to Decimal."""
     if isinstance(value, Decimal):
         return value
     if isinstance(value, bool):

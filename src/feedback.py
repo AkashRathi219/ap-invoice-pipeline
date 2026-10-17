@@ -45,6 +45,11 @@ def _decision(record: dict) -> dict:
 
 
 def run_telemetry_row(record: dict) -> dict:
+    """Builds a flattened telemetry dictionary tracking model performance, latency, and tokens.
+
+    Where called:
+        Called inside write_all() for every invoice record in the batch.
+    """
     decision = _decision(record)
     verification = record.get("verification") or {}
     vendor_match = record.get("vendor_match") or {}
@@ -86,6 +91,7 @@ def run_telemetry_row(record: dict) -> dict:
 
 
 def write_telemetry(rows: Iterable[dict], path: Path | str) -> Path:
+    """Exports run telemetry logs to JSONL file."""
     path = Path(path)
     with path.open("w", encoding="utf-8") as fh:
         for row in rows:
@@ -94,6 +100,7 @@ def write_telemetry(rows: Iterable[dict], path: Path | str) -> Path:
 
 
 def record_feedback(path: Path | str, events: Iterable[dict]) -> Path:
+    """Records human reviewer actions (ACCEPT/REJECT/OVERRIDE) into append-only feedback journal."""
     path = Path(path)
     clean = []
     for event in events:
@@ -115,6 +122,7 @@ def record_feedback(path: Path | str, events: Iterable[dict]) -> Path:
 
 
 def read_feedback(path: Path | str) -> list[dict]:
+    """Reads recorded reviewer actions from journal file."""
     path = Path(path)
     if not path.exists():
         return []
@@ -127,6 +135,7 @@ def read_feedback(path: Path | str) -> list[dict]:
 
 
 def recommend_thresholds(telemetry: Iterable[dict], feedback: Iterable[dict] | None = None) -> dict:
+    """Loop A: Suggests recalibrated cosine thresholds based on reviewer false positive rejects."""
     feedback = list(feedback or [])
     rows = {row.get("invoice_id"): row for row in telemetry}
     categories: dict[str, dict] = {}
@@ -156,6 +165,7 @@ def recommend_thresholds(telemetry: Iterable[dict], feedback: Iterable[dict] | N
 
 
 def write_threshold_suggestions(suggestions: dict, path: Path | str) -> Path:
+    """Writes Loop A threshold recommendations to output/threshold_suggestions.json."""
     path = Path(path)
     payload = dict(suggestions)
     payload["generated_at"] = _iso_now()
@@ -165,6 +175,7 @@ def write_threshold_suggestions(suggestions: dict, path: Path | str) -> Path:
 
 
 def few_shot_exemplars(records: Iterable[dict], max_exemplars: int = 8) -> list[dict]:
+    """Loop B: Curates high-signal input/output examples from the batch to populate the few-shot bank."""
     exemplars: list[dict] = []
     for record in records:
         verdicts = (record.get("duplicates") or {}).get("impostor_verdicts") or []
@@ -179,7 +190,7 @@ def few_shot_exemplars(records: Iterable[dict], max_exemplars: int = 8) -> list[
                               f"qty_match={pair[0].get('quantity_match')} "
                               f"unit_price_ratio={pair[0].get('unit_price_ratio')}"),
                     "output": (f"{verdict.get('risk_level')} · {verdict.get('pattern')} · "
-                               f"disposition {_decision(record).get('disposition')}"),
+                                f"disposition {_decision(record).get('disposition')}"),
                 })
             continue
         decision = _decision(record)
@@ -201,8 +212,7 @@ def few_shot_exemplars(records: Iterable[dict], max_exemplars: int = 8) -> list[
 
 
 def write_few_shot_bank(records: Iterable[dict], path: Path | str, max_exemplars: int = 8) -> Path:
-    """Loop B — batch-derived exemplars. The committed seed lives in `config/few_shot_bank.json`;
-    this output artefact (git-ignored) is what a fresh run derives from the measured batch."""
+    """Exports batch-curated few-shot examples to JSON."""
     path = Path(path)
     payload = {
         "version": FEW_SHOT_VERSION,
@@ -216,6 +226,7 @@ def write_few_shot_bank(records: Iterable[dict], path: Path | str, max_exemplars
 
 
 def fine_tuning_pairs(records: Iterable[dict]) -> list[dict]:
+    """Loop C: Converts batch exceptions and forensic verdicts into Alpaca-format instruction pairs."""
     pairs: list[dict] = []
     for record in records:
         decision = _decision(record)
@@ -267,6 +278,7 @@ def fine_tuning_pairs(records: Iterable[dict]) -> list[dict]:
 
 
 def write_fine_tuning(records: Iterable[dict], path: Path | str) -> Path:
+    """Exports instruction tuning dataset to output/fine_tuning_dataset.jsonl for local LoRA training."""
     path = Path(path)
     pairs = fine_tuning_pairs(records)
     with path.open("w", encoding="utf-8") as fh:
@@ -295,6 +307,14 @@ def _count_llm_rationale(records: list[dict]) -> int:
 def write_all(records: list[dict], out_dir: Path | str, config_dir: Path | str,
               telemetry_rows: list[dict] | None = None,
               feedback: list[dict] | None = None) -> dict:
+    """Orchestrates writing of all feedback artefacts (telemetry, fine-tuning dataset, few-shot bank, suggestions).
+
+    Where called:
+        Called by run.py at Step S11 in Pass 2.
+
+    Where it sends information:
+        Writes 4 files into the output/ directory.
+    """
     out_dir = Path(out_dir)
     config_dir = Path(config_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

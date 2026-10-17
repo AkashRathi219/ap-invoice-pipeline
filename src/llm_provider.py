@@ -35,6 +35,7 @@ class LLMBadOutput(RuntimeError):
 
 @dataclass(frozen=True)
 class LLMResult:
+    """Enriched container holding structured model response, metadata, and token telemetry."""
     data: dict
     model: str
     prompt_version: str
@@ -44,6 +45,22 @@ class LLMResult:
 
 
 def is_reachable(base_url: str, timeout: float = 2.0) -> bool:
+    """Checks if the local Ollama daemon is running and reachable via HTTP GET /api/version.
+
+    Args:
+        base_url: Ollama base endpoint URL.
+        timeout: Network probe timeout in seconds.
+
+    Returns:
+        True if reachable and status 200, False otherwise.
+
+    Where called:
+        Called by run.py before starting batch loop to select AI vs regex mode,
+        and inside chat_json() before issuing model prompts.
+
+    Where it sends information:
+        Returned to run.py to set ai_available flag and output terminal log mode.
+    """
     try:
         with urllib.request.urlopen(f"{base_url}/api/version", timeout=timeout) as resp:
             return resp.status == 200
@@ -52,7 +69,20 @@ def is_reachable(base_url: str, timeout: float = 2.0) -> bool:
 
 
 def loaded_models(base_url: str = DEFAULT_BASE_URL) -> list[str]:
-    """Names of models currently resident in memory (GET /api/ps)."""
+    """Inspects currently resident models in Ollama GPU/system memory via GET /api/ps.
+
+    Args:
+        base_url: Ollama base endpoint URL.
+
+    Returns:
+        List of resident model name strings.
+
+    Where called:
+        Called during memory management checks and integration test assertions.
+
+    Where it sends information:
+        Returns list to caller for audit logging and memory health verification.
+    """
     try:
         with urllib.request.urlopen(f"{base_url}/api/ps", timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -62,7 +92,21 @@ def loaded_models(base_url: str = DEFAULT_BASE_URL) -> list[str]:
 
 
 def unload(model: str, base_url: str = DEFAULT_BASE_URL) -> bool:
-    """Free the model from RAM/VRAM immediately (keep_alive=0). True on success."""
+    """Ejects model weights from RAM/VRAM immediately by sending keep_alive=0 to /api/generate.
+
+    Args:
+        model: Model identifier string (e.g. 'llama3.2:3b').
+        base_url: Ollama base endpoint URL.
+
+    Returns:
+        True on successful unload, False on network or request failure.
+
+    Where called:
+        Called at the very end of run.py (Step S11 cleanup) unless --keep-loaded is passed.
+
+    Where it sends information:
+        Sends POST request directly to local Ollama server, freeing ~2.0 GB system RAM.
+    """
     try:
         req = urllib.request.Request(
             f"{base_url}/api/generate",
@@ -78,6 +122,7 @@ def unload(model: str, base_url: str = DEFAULT_BASE_URL) -> bool:
 
 
 def _post_chat(payload: dict, base_url: str) -> dict:
+    """Internal helper to dispatch JSON POST payload to Ollama /api/chat endpoint."""
     req = urllib.request.Request(
         f"{base_url}/api/chat",
         data=json.dumps(payload).encode("utf-8"),
@@ -99,7 +144,34 @@ def chat_json(
     keep_alive: str | int | None = KEEP_ALIVE,
     max_attempts: int = 2,
 ) -> LLMResult:
-    """One schema-constrained chat call returning a parsed JSON object."""
+    """Executes a single schema-constrained chat completion and returns validated parsed JSON.
+
+    Args:
+        system: System instructions setting the role and schema contract.
+        user: Input prompt containing document text, line items, or pair evidence.
+        schema: Optional JSON Schema dict passed to Ollama format option for strict adherence.
+        model: Name of model to invoke (e.g., 'llama3.2:3b').
+        prompt_version: Version tag (e.g. 'ap-extract-v1', 'ap-forensic-v1') for audit tracking.
+        temperature: Sampling temperature (pinned at 0.0 for determinism).
+        base_url: Ollama API URL.
+        keep_alive: Time to retain weights in memory (e.g. '5m').
+        max_attempts: Retry budget (falls back from schema to generic JSON format on attempt 2).
+
+    Returns:
+        LLMResult containing parsed dict data, token counts, and request latency.
+
+    Raises:
+        LLMUnavailable: If Ollama server is offline.
+        LLMBadOutput: If model fails to return parseable JSON within retry budget.
+
+    Where called:
+        Called by extract_invoice_ai() (S3), forensic_verdict() (S8),
+        enrich_record() (S9), and decide_all() (S10).
+
+    Where it sends information:
+        Returns structured LLMResult to calling modules to populate intermediate records
+        and feed ai_telemetry.jsonl.
+    """
     if not is_reachable(base_url):
         raise LLMUnavailable(f"Ollama not reachable at {base_url}")
 
@@ -118,6 +190,7 @@ def chat_json(
         }
         if keep_alive is not None:
             payload["keep_alive"] = keep_alive
+
         started = time.perf_counter()
         try:
             response = _post_chat(payload, base_url)

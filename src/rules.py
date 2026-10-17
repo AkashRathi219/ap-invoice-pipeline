@@ -26,14 +26,22 @@ _KNOWN_CURRENCIES = {"EUR", "GBP", "USD", "CHF"}
 
 
 def check_vendor(vendor_match: VendorMatch) -> dict:
-    """R1 — vendor identity / status."""
+    """Evaluates Rule R1: Vendor master existence and operational status.
+
+    - Unknown vendor -> HOLD ('R1_unknown_vendor')
+    - Inactive vendor -> HOLD ('R1_inactive_vendor')
+    - Fuzzy match with disagreeing country -> flag ('R1_country_conflict')
+
+    Where called:
+        Called inside run_rules().
+    """
     if vendor_match.status == "unknown":
         return {"rule_id": "R1", "status": HOLD, "reason_code": "R1_unknown_vendor",
                 "detail": f"vendor '{vendor_match.vendor_name}' not in master"}
     if vendor_match.status == "fuzzy":
         if vendor_match.country_match is False:
             return {"rule_id": "R1", "status": "flag", "reason_code": "R1_country_conflict",
-                    "detail": f"fuzzy vendor {vendor_match.vendor_name_matched} but country disagrees"}
+                "detail": f"fuzzy vendor {vendor_match.vendor_name_matched} but country disagrees"}
         return {"rule_id": "R1", "status": "pass", "reason_code": None,
                 "detail": f"fuzzy vendor confirmed {vendor_match.vendor_name_matched}"}
     row = vendor_match.vendor_row
@@ -45,7 +53,14 @@ def check_vendor(vendor_match: VendorMatch) -> dict:
 
 
 def check_currency(record: dict, vendor_match: VendorMatch) -> dict:
-    """R2 — invoice currency vs master approved_currency (L4)."""
+    """Evaluates Rule R2: Compares invoice billing currency against master approved currency.
+
+    - Unrecognised currency ISO code -> HOLD ('R2_currency_unrecognised')
+    - Currency differs from vendor master approved currency -> flag ('R2_currency_mismatch')
+
+    Where called:
+        Called inside run_rules().
+    """
     currency = str(record.get("currency") or "").strip().upper()
     row = vendor_match.vendor_row
     if row is None:
@@ -66,11 +81,13 @@ def check_currency(record: dict, vendor_match: VendorMatch) -> dict:
 
 
 def check_threshold(amount_eur, vendor_row: VendorRow | None) -> dict:
-    """R3 — EUR-normalised amount (L5) vs the master spend threshold.
+    """Evaluates Rule R3: Checks if EUR-converted spend exceeds vendor spend threshold.
 
-    An unverified total is a **review flag**, not a structural hold: the invoice is well formed,
-    the two readers simply disagree about one number, and a human resolves that disagreement.
-    Either way the invoice cannot reach the payment queue automatically.
+    - Disagreeing or unverified total -> flag ('R3_amount_unavailable')
+    - Amount > spend_threshold_eur -> flag ('R3_above_threshold')
+
+    Where called:
+        Called inside run_rules().
     """
     if amount_eur is None:
         return {"rule_id": "R3", "status": "flag", "reason_code": "R3_amount_unavailable",
@@ -88,7 +105,13 @@ def check_threshold(amount_eur, vendor_row: VendorRow | None) -> dict:
 
 
 def check_dual_approval(vendor_row: VendorRow | None) -> dict:
-    """R4 — master dual-approval routing flag (L6)."""
+    """Evaluates Rule R4: Checks if vendor configuration mandates dual approvers.
+
+    - requires_dual_approval == True -> flag ('R4_dual_approval_required')
+
+    Where called:
+        Called inside run_rules().
+    """
     if vendor_row is not None and vendor_row.requires_dual_approval:
         return {"rule_id": "R4", "status": "flag", "reason_code": "R4_dual_approval_required",
                 "detail": f"dual approval required for {vendor_row.vendor_id}"}
@@ -97,7 +120,13 @@ def check_dual_approval(vendor_row: VendorRow | None) -> dict:
 
 
 def check_po(record: dict) -> dict:
-    """R6 — PO reference presence (P6 / L9)."""
+    """Evaluates Rule R6: Mandatory PO reference presence check.
+
+    - Missing or blank po_number -> HOLD ('R6_po_missing')
+
+    Where called:
+        Called inside run_rules().
+    """
     po_number = record.get("po_number")
     if po_number is None or not str(po_number).strip():
         return {"rule_id": "R6", "status": HOLD, "reason_code": "R6_po_missing",
@@ -107,7 +136,23 @@ def check_po(record: dict) -> dict:
 
 
 def run_rules(record: dict, vendor_match: VendorMatch, amount_eur) -> list[dict]:
-    """Run the applicable rules in R1..R6 order -> ordered list of rule results."""
+    """Applies core deterministic AP rules (R1, R2, R3, R4, R6) against an invoice record.
+
+    Args:
+        record: Extracted and verified invoice record.
+        vendor_match: Matched master vendor result.
+        amount_eur: EUR amount from fx.py to_eur().
+
+    Returns:
+        List of rule evaluation result dictionaries.
+
+    Where called:
+        Called by run.py in Pass 1, and by tests/test_rules.py.
+
+    Where it sends information:
+        Saved into record['rules']['results']. Combined later with R5b (historic)
+        and R5a (batch duplicates) to compute final disposition.
+    """
     return [
         check_vendor(vendor_match),
         check_currency(record, vendor_match),
@@ -118,7 +163,18 @@ def run_rules(record: dict, vendor_match: VendorMatch, amount_eur) -> list[dict]
 
 
 def disposition(results: list[dict]) -> str:
-    """Disposition ladder: HOLD > FLAG-REVIEW > CLEAR."""
+    """Derives aggregate status according to the strict priority ladder: HOLD > FLAG-REVIEW > CLEAR.
+
+    Args:
+        results: List of rule result dictionaries.
+
+    Returns:
+        One of 'HOLD', 'FLAG-REVIEW', or 'CLEAR'.
+
+    Where called:
+        Called in run.py during Pass 1, again after Pass 2 batch duplicate insertion,
+        and inside decide.py.
+    """
     if any(r["status"] == HOLD for r in results):
         return HOLD
     if any(r["status"] == "flag" for r in results):
@@ -127,10 +183,10 @@ def disposition(results: list[dict]) -> str:
 
 
 def active_reasons(results: list[dict]) -> list[dict]:
-    """The rule results that stopped a CLEAR — ordered, with their reason codes only."""
+    """Filters rule results to only those that triggered a non-CLEAR condition."""
     return [r for r in results if r.get("reason_code")]
 
 
 def reason_codes(results: list[dict]) -> list[str]:
-    """Reason codes carried by the non-CLEAR results, in rule order."""
+    """Extracts ordered list of reason code strings (e.g. ['R1_inactive_vendor', 'R6_po_missing'])."""
     return [r["reason_code"] for r in active_reasons(results)]

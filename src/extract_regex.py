@@ -31,16 +31,35 @@ class ExtractionError(Exception):
 
 
 def read_pdf_text(path: Path) -> str:
+    """Extracts raw plain text stream from all pages of a PDF document using PyMuPDF (fitz).
+
+    Args:
+        path: Filepath to target PDF.
+
+    Returns:
+        Joined multiline string of extracted page text.
+
+    Where called:
+        Called by run.py in the Pass 1 per-invoice loop before launching extractors.
+
+    Where it sends information:
+        Sent to both extract_invoice_ai() and extract_invoice_regex() for processing.
+    """
     with fitz.open(path) as doc:
         return "\n".join(page.get_text("text") for page in doc)
 
 
 def split_lines(text: str) -> list[str]:
+    """Cleans up raw text, normalises non-breaking spaces, and strips whitespace from non-empty lines."""
     text = text.replace("\\n", "\n").replace("\u00a0", " ")
     return [ln.strip() for ln in text.splitlines() if ln.strip()]
 
 
 def parse_money(token: str | None) -> Decimal | None:
+    """Parses raw text currency representations into exact Python Decimal objects.
+
+    Strips symbols (€, £, $), ISO codes (EUR, GBP), commas, and spaces. Money is never float.
+    """
     if token is None:
         return None
     t = token.strip()
@@ -56,6 +75,7 @@ def parse_money(token: str | None) -> Decimal | None:
 
 
 def _value_after(lines: list[str], label: str) -> str | None:
+    """Extracts string value following a specific header label prefix in a line."""
     for ln in lines:
         if ln.startswith(label):
             value = ln[len(label):].strip()
@@ -64,6 +84,7 @@ def _value_after(lines: list[str], label: str) -> str | None:
 
 
 def detect_format(lines: list[str]) -> str | None:
+    """Detects layout class: 'A' (Standard structured digital) vs 'B' (Compact scan-style)."""
     if any(ln.startswith("Invoice Number:") for ln in lines):
         return "A"
     if any(ln.startswith("Invoice No:") for ln in lines):
@@ -72,6 +93,25 @@ def detect_format(lines: list[str]) -> str | None:
 
 
 def extract_invoice_regex(text: str, source_name: str) -> dict:
+    """Performs deterministic second-read extraction over PDF text using pattern matching.
+
+    Extracts vendor identity, dates, PO, line-item chunks (desc, qty, unit, amt), raw total
+    tokens (preserving line breaks for wrap detection), currency signals, and banking details.
+
+    Args:
+        text: Raw text string from read_pdf_text().
+        source_name: Name of PDF file for diagnostic messages.
+
+    Returns:
+        Dict representation of extracted fields tagged as 'regex_corroboration'.
+
+    Where called:
+        Called by run.py in Pass 1 as the secondary witness read, and by test_extract_regex.py.
+
+    Where it sends information:
+        Sent to validate_extract.py (verify()) for arithmetic reconciliation against the AI read,
+        and used as fallback input in extract_invoice_fallback_regex() if Ollama is unavailable.
+    """
     lines = split_lines(text)
     fmt = detect_format(lines)
     if fmt is None:

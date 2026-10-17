@@ -83,6 +83,7 @@ FORENSIC_SCHEMA = {
 
 @dataclass(frozen=True)
 class HistoricInvoice:
+    """Historical invoice row from historic_invoices.csv."""
     invoice_id: str
     vendor_id: str
     vendor_name: str
@@ -95,10 +96,17 @@ class HistoricInvoice:
 
 
 def load_historic(path: Path = DEFAULT_HISTORIC_PATH) -> list[HistoricInvoice]:
-    """Read `historic_invoices.csv` -> list of HistoricInvoice.
+    """Reads historic_invoices.csv into a list of HistoricInvoice dataclasses.
 
-    H3 (`vendor_name`) is carried for the audit trail but never used for matching — the matcher
-    joins on H2 (`vendor_id`) only (H3 may disagree with the master; the data dictionary warns it).
+    Note:
+        H3 (vendor_name) is carried only for audit display. Matching always joins
+        on H2 (vendor_id) because the data dictionary notes historic names may differ.
+
+    Where called:
+        Called by run.py at initialization, and by test_duplicates.py.
+
+    Where it sends information:
+        Passed to check_historic() on each invoice in Pass 1.
     """
     rows: list[HistoricInvoice] = []
     with Path(path).open("r", encoding="utf-8-sig", newline="") as fh:
@@ -127,7 +135,18 @@ def check_historic(
     amount_tolerance_pct: float = 2.0,
     date_window_days: int = 30,
 ) -> dict:
-    """R5b — vendor-scoped metadata match against history. Scored evidence, never a silent verdict."""
+    """Evaluates Rule R5b: Checks for exact or near-duplicates against 12 months of history.
+
+    Scoped strictly to the same vendor_id:
+    - Exact match on invoice number or PO number -> flag ('R5b_exact_duplicate')
+    - Near-duplicate match inside amount_tolerance_pct (±2%) AND date_window_days (30d) -> flag ('R5b_near_duplicate')
+
+    Where called:
+        Called by run.py at the end of Pass 1 for each invoice.
+
+    Where it sends information:
+        Appended to record['rules']['results'] and saved in record['duplicates']['vs_historic'].
+    """
     tolerance = Decimal(str(amount_tolerance_pct))
     invoice_number = str(record.get("invoice_number") or "").strip()
     po_number = str(record.get("po_number") or "").strip()
@@ -249,7 +268,7 @@ def _gap_days(a: date | None, b_iso: str) -> int | None:
 # ----------------------------------------------------------------------------------- embeddings
 
 class Embedder:
-    """Text -> vector. sentence-transformers when installed, dependency-free n-grams otherwise."""
+    """Text to vector encoder. Uses all-MiniLM-L6-v2 when installed, else dependency-free n-grams."""
 
     def __init__(self, backend: str = "auto") -> None:
         self.requested = backend
@@ -265,6 +284,7 @@ class Embedder:
                 self._model = None
 
     def encode(self, text: str):
+        """Encodes text string into a normalized embedding vector or sparse n-gram dict."""
         if self._model is not None:
             vector = self._model.encode([text], normalize_embeddings=True)[0]
             return [float(x) for x in vector]
@@ -272,6 +292,7 @@ class Embedder:
 
 
 def normalise_text(text) -> str:
+    """Normalises text for n-gram feature generation: lowercase, accents removed, non-alphanumeric to spaces."""
     text = unicodedata.normalize("NFKD", str(text or ""))
     text = "".join(ch for ch in text if not unicodedata.combining(ch)).casefold()
     text = re.sub(r"[^a-z0-9]+", " ", text)
@@ -279,6 +300,7 @@ def normalise_text(text) -> str:
 
 
 def ngram_vector(text: str, n: int = 4) -> dict[str, float]:
+    """Builds an L2-normalized sparse character n-gram frequency dictionary."""
     padded = f" {normalise_text(text)} "
     counts: dict[str, float] = {}
     for i in range(len(padded) - n + 1):
@@ -289,7 +311,7 @@ def ngram_vector(text: str, n: int = 4) -> dict[str, float]:
 
 
 def cosine(a, b) -> float:
-    """Cosine similarity over sparse dict vectors (n-gram) or dense lists (MiniLM)."""
+    """Computes cosine similarity between sparse dicts (n-gram) or dense lists (embeddings)."""
     if not a or not b:
         return 0.0
     if isinstance(a, dict):
@@ -303,7 +325,7 @@ def cosine(a, b) -> float:
 
 
 def service_line_items(record: dict) -> list[dict]:
-    """Line items that are actual services (totals/VAT rows captured by the reader are dropped)."""
+    """Filters line items to genuine billable services, dropping table footers and VAT summary rows."""
     out: list[dict] = []
     for item in record.get("line_items") or []:
         if not isinstance(item, dict):
@@ -316,12 +338,12 @@ def service_line_items(record: dict) -> list[dict]:
 
 
 def description_document(record: dict) -> str:
-    """The text the similarity layer sees: the service descriptions, one per line."""
+    """Assembles all service line descriptions into a single multi-line text document."""
     return " \n ".join(str(item.get("description") or "") for item in service_line_items(record))
 
 
 def align_line_items(items_a: list[dict], items_b: list[dict]) -> list[tuple[dict, dict]]:
-    """Greedy one-to-one alignment of line items by description similarity."""
+    """Performs greedy 1-to-1 matching of line items between two invoices based on description cosine."""
     remaining = list(range(len(items_b)))
     aligned: list[tuple[dict, dict]] = []
     for item_a in items_a:
@@ -339,7 +361,7 @@ def align_line_items(items_a: list[dict], items_b: list[dict]) -> list[tuple[dic
 
 
 def quantity_match(aligned: list[tuple[dict, dict]]) -> float:
-    """Mean of min(qa,qb)/max(qa,qb) over aligned services. 1.0 = identical quantities."""
+    """Computes mean min(qa, qb)/max(qa, qb) across aligned items. 1.0 = identical quantities."""
     ratios: list[float] = []
     for item_a, item_b in aligned:
         qa, qb = _dec(item_a.get("qty")), _dec(item_b.get("qty"))
@@ -356,7 +378,7 @@ def quantity_match(aligned: list[tuple[dict, dict]]) -> float:
 
 
 def unit_price_ratio(aligned: list[tuple[dict, dict]]) -> float | None:
-    """Median of unit_price_b / unit_price_a over aligned services (the price-scaling signal)."""
+    """Calculates median unit_price_b / unit_price_a ratio across aligned line items."""
     ratios: list[float] = []
     for item_a, item_b in aligned:
         pa, pb = _dec(item_a.get("unit_price")), _dec(item_b.get("unit_price"))
@@ -373,7 +395,7 @@ def unit_price_ratio(aligned: list[tuple[dict, dict]]) -> float | None:
 # ------------------------------------------------------------------------------ within-batch R5a
 
 def vendor_key(record: dict) -> str:
-    """Identity used to decide whether two invoices come from different vendors."""
+    """Returns canonical vendor identifier (vendor_id or normalised name)."""
     vendor_id = ((record.get("vendor_match") or {}).get("vendor_id") or "").strip()
     if vendor_id:
         return vendor_id.upper()
@@ -381,7 +403,7 @@ def vendor_key(record: dict) -> str:
 
 
 def counterparty_risk(record: dict) -> tuple[bool, str]:
-    """Is this counterparty payment-eligible? Returns (risky, human label)."""
+    """Checks whether invoice vendor is ineligible for automated payment (unknown or INACTIVE)."""
     match_status = ((record.get("vendor_match") or {}).get("status") or "").lower()
     master_status = str((record.get("vendor_master") or {}).get("status") or "").upper()
     if match_status == "unknown" or not (record.get("vendor_match") or {}).get("vendor_id"):
@@ -393,6 +415,7 @@ def counterparty_risk(record: dict) -> tuple[bool, str]:
 
 @dataclass
 class PairEvidence:
+    """Container holding multi-dimensional comparison metrics for a pair of invoices."""
     a_invoice: str
     b_invoice: str
     a_vendor: str
@@ -442,10 +465,17 @@ def find_within_batch_pairs(
     evidence_floor: float = 0.60,
     max_services: int = 6,
 ) -> list[PairEvidence]:
-    """R5a — every cross-invoice pair whose service descriptions are close, scored and classified.
+    """Evaluates Rule R5a: Cross-invoice semantic duplicate and fraud impostor detection across the batch.
 
-    Pairs *below* the flag gate are still returned (evidence_floor allows the reader to see the
-    near-misses, e.g. the fuel trio) — evidence is published, flags are earned.
+    Flags pairs satisfying the full clone signature:
+    cross_vendor ∧ cosine >= 0.85 ∧ equal lines ∧ qty_match >= 0.95 ∧ counterparty not payment-eligible.
+
+    Where called:
+        Called by run.py in Pass 2 across all extracted batch records.
+
+    Where it sends information:
+        Returned pairs are attached to target invoices. Flagged pairs are escalated
+        to forensic_verdict() and injected into the rule results via pair_rule().
     """
     emb = embedder or Embedder()
     vectors = [emb.encode(description_document(r)) for r in records]
@@ -518,7 +548,7 @@ def find_within_batch_pairs(
 
 
 def pair_rule(pair: PairEvidence) -> dict:
-    """Rule-shaped result for the disposition ladder (R5a)."""
+    """Formats a PairEvidence object into a standard rule result dict for Rule R5a."""
     if pair.flagged:
         detail = (
             f"{pair.b_vendor} ({pair.b_standing}) invoices the same {len(pair.paired_services)} "
@@ -539,11 +569,7 @@ def pair_rule(pair: PairEvidence) -> dict:
 
 
 def deterministic_verdict(pair: PairEvidence) -> dict:
-    """Gate verdict — the operative severity, derived from the measured evidence only.
-
-    Payment eligibility is a deterministic fact, so severity is owned here: a counterparty that is
-    not payment-eligible (unknown vendor or INACTIVE) makes a clone package CRITICAL.
-    """
+    """Computes deterministic baseline verdict for a flagged clone pair (severity owner)."""
     risk = _gate_risk(pair)
     explanation = (
         f"{pair.b_vendor} ({pair.b_standing}) bills the same services with the same quantities as "
@@ -580,13 +606,16 @@ def forensic_verdict(
     record_b: dict,
     llm_cfg: dict | None = None,
 ) -> dict:
-    """Structured LLM verdict for a flagged pair; deterministic fallback when AI is unavailable.
+    """Queries local LLM for forensic impostor analysis on flagged clone pairs.
 
-    The model may *raise* the severity but can never lower it: `risk_level` is the gate severity
-    raised to the model's grade when the model is more severe, and the model's own grade is kept
-    verbatim as `ai_risk_level`. Measured on the batch, a 3B model graded both confirmed clone pairs
-    LOW while its own prose described a cloned invoice — exactly the judgement the gate must not
-    hand over.
+    Enforces the 'AI proposes, math disposes' guardrail:
+    The LLM may raise the gate severity, but cannot lower it (model LOW is overridden by gate CRITICAL).
+
+    Where called:
+        Called by run.py in Pass 2 for each flagged pair from find_within_batch_pairs().
+
+    Where it sends information:
+        Saved in record['duplicates']['impostor_verdicts'] and used in decide.py.
     """
     gate = deterministic_verdict(pair)
     if not llm_cfg:

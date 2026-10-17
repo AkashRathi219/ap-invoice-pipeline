@@ -148,10 +148,12 @@ def exception_records(records: Iterable[dict]) -> list[dict]:
 # ----------------------------------------------------------------------------------- oracle
 
 def load_oracle(path: Path | str | None = None) -> dict:
+    """Loads committed expected ground-truth oracle from config/oracle_dispositions.json."""
     return json.loads(Path(path or DEFAULT_ORACLE_PATH).read_text(encoding="utf-8"))
 
 
 def measured_totals(records: Iterable[dict]) -> dict:
+    """Aggregates batch counts per disposition class (CLEAR, FLAG-REVIEW, HOLD)."""
     totals: dict[str, int] = {}
     for record in records:
         disposition = disposition_of(record)
@@ -160,7 +162,14 @@ def measured_totals(records: Iterable[dict]) -> dict:
 
 
 def verify_oracle(records: Iterable[dict], oracle: dict | None = None) -> dict:
-    """Compare measured dispositions against the committed §5.3 oracle, invoice by invoice."""
+    """Compare measured dispositions against the committed §5.3 oracle, invoice by invoice.
+
+    Where called:
+        Called inside build_outputs() and in tests/test_summarize.py.
+
+    Where it sends information:
+        Printed to console in run.py and embedded into summary.md, report.html, and batch_report.json.
+    """
     oracle = oracle or load_oracle()
     expected = oracle.get("totals") or {}
     expected_by_invoice = {k: v.get("expected") for k, v in (oracle.get("invoices") or {}).items()}
@@ -190,6 +199,7 @@ def verify_oracle(records: Iterable[dict], oracle: dict | None = None) -> dict:
 # ----------------------------------------------------------------------------------- writers
 
 def write_invoices_csv(records: Iterable[dict], path: Path | str) -> Path:
+    """Exports 25-column invoices_processed.csv with UTF-8 BOM encoding for Excel compatibility."""
     path = Path(path)
     with path.open("w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=INVOICE_COLUMNS, extrasaction="ignore")
@@ -229,6 +239,7 @@ def write_invoices_csv(records: Iterable[dict], path: Path | str) -> Path:
 
 
 def write_exceptions_csv(records: Iterable[dict], path: Path | str) -> Path:
+    """Exports prioritised exceptions.csv (HOLD then FLAG-REVIEW, ordered by risk)."""
     path = Path(path)
     with path.open("w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=EXCEPTION_COLUMNS, extrasaction="ignore")
@@ -255,6 +266,7 @@ def write_exceptions_csv(records: Iterable[dict], path: Path | str) -> Path:
 
 
 def write_audit_log(records: Iterable[dict], meta: dict, path: Path | str) -> Path:
+    """Writes immutable event audit log in JSONL format with RUN_START and INVOICE_DECIDED events."""
     path = Path(path)
     records = list(records)
     with path.open("w", encoding="utf-8") as fh:
@@ -484,6 +496,7 @@ def _ai_usage_table(records: list[dict], meta: dict) -> str:
 
 
 def render_report_html(records: list[dict], meta: dict, oracle_result: dict) -> str:
+    """Renders self-contained HTML report with KPI cards, exceptions table, and duplicate analysis."""
     records = list(records)
     totals = measured_totals(records)
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -521,6 +534,7 @@ def render_report_html(records: list[dict], meta: dict, oracle_result: dict) -> 
 
 def write_report_html(records: list[dict], meta: dict, oracle_result: dict,
                       path: Path | str) -> Path:
+    """Writes standalone HTML report dashboard to disk."""
     path = Path(path)
     path.write_text(render_report_html(records, meta, oracle_result), encoding="utf-8")
     return path
@@ -554,6 +568,7 @@ def _summary_paragraph(records: list[dict]) -> str:
 
 def write_summary_md(records: list[dict], meta: dict, oracle_result: dict,
                      path: Path | str) -> Path:
+    """Builds executive brief summary.md for Accounts Payable leadership."""
     path = Path(path)
     records = list(records)
     totals = measured_totals(records)
@@ -664,7 +679,15 @@ def write_summary_md(records: list[dict], meta: dict, oracle_result: dict,
 
 def build_outputs(records: list[dict], meta: dict, out_dir: Path | str,
                   oracle_path: Path | str | None = None) -> dict:
-    """Write every S11 artefact and return the paths + the oracle verdict."""
+    """Write every S11 artefact and return the paths + the oracle verdict.
+
+    Where called:
+        Called by run.py at Step S11 in Pass 2.
+
+    Where it sends information:
+        Writes 6 files to output/: invoices_processed.csv, exceptions.csv, summary.md,
+        batch_report.json, audit_log.jsonl, and report.html.
+    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = list(records)

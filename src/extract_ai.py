@@ -92,7 +92,7 @@ _ITEM_MONEY_KEYS = ("unit_price", "amount")
 
 
 def _dec(value) -> Decimal | None:
-    """JSON number -> Decimal without float artifacts (str() round-trip)."""
+    """Safely converts parsed JSON numbers or strings into Decimal without floating-point errors."""
     if value is None:
         return None
     try:
@@ -102,6 +102,7 @@ def _dec(value) -> Decimal | None:
 
 
 def _normalise(data: dict) -> dict:
+    """Normalises raw dict from Ollama JSON output into strongly-typed Decimals and canonical nulls."""
     items = []
     for raw in data.get("line_items") or []:
         if not isinstance(raw, dict):
@@ -146,7 +147,27 @@ def extract_invoice_ai(
     prompt_version: str = PROMPT_VERSION,
     max_chars: int = 8000,
 ) -> dict:
-    """Primary extraction: AI reads the raw text; provenance and telemetry travel with the record."""
+    """Executes schema-constrained LLM extraction of invoice fields via local Ollama.
+
+    Args:
+        text: Raw document text extracted from PDF.
+        source_name: Name of PDF file.
+        model: Configured LLM identifier (e.g. 'llama3.2:3b').
+        base_url: Ollama API URL.
+        temperature: Sampling temperature (0.0 for determinism).
+        prompt_version: Tag identifying the prompt version ('ap-extract-v1').
+        max_chars: Character limit to avoid exceeding context window.
+
+    Returns:
+        Structured invoice dictionary tagged with layer 'ai_primary', latency, and tokens.
+
+    Where called:
+        Called by run.py in Pass 1 as the primary reader for every invoice in the batch.
+
+    Where it sends information:
+        Returned to run.py, which passes it immediately to validate_extract.py (verify())
+        to reconcile with the regex corroboration read.
+    """
     result: LLMResult = chat_json(
         system=SYSTEM_PROMPT,
         user=USER_TEMPLATE.format(text=text[:max_chars]),
@@ -172,7 +193,22 @@ def extract_invoice_ai(
 
 
 def extract_invoice_fallback_regex(text: str, source_name: str, regex_record: dict) -> dict:
-    """Named offline fallback: promote the corroboration stream when no LLM is reachable (P-E01)."""
+    """Promotes regex corroboration stream to primary record when LLM is offline or disabled.
+
+    Args:
+        text: Raw text of the invoice.
+        source_name: Name of PDF file.
+        regex_record: Record extracted by extract_invoice_regex().
+
+    Returns:
+        Record dict tagged as 'regex_fallback' with nullified model/token fields.
+
+    Where called:
+        Called by run.py when --no-ai is specified or if Ollama raises LLMUnavailable/LLMBadOutput.
+
+    Where it sends information:
+        Supplies the primary record to the rest of the pipeline so execution continues uninterrupted.
+    """
     record = dict(regex_record)
     record.update({
         "source_file": source_name,

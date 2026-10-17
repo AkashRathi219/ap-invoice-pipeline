@@ -1,5 +1,10 @@
 {
+  "_comment_overview": "Pipeline Configuration: Central control parameters, tolerances, and model configurations for AP Intelligent Processing Pipeline.",
+  
+  "_comment_expected_invoice_count": "Expected batch size. Ingest gate (src/ingest.py) verifies exact count matches before processing.",
   "expected_invoice_count": 17,
+  
+  "_comment_llm": "Local LLM settings for Ollama runtime used across extraction (src/extract_ai.py), forensic impostor analysis (src/duplicates.py), and plain-language reasoning (src/enrich.py, src/decide.py).",
   "llm": {
     "provider": "ollama",
     "base_url": "http://127.0.0.1:11434",
@@ -7,13 +12,19 @@
     "temperature": 0.0,
     "prompt_version": "ap-extract-v1"
   },
+  
+  "_comment_verification": "Arithmetic authority tolerances used in src/validate_extract.py. Line math (subtotal + VAT) must reconcile to within money_tolerance (EUR 0.01).",
   "verification": {
     "money_tolerance": "0.01",
     "authority": "subtotal_plus_vat"
   },
+  
+  "_comment_vendor_match": "Difflib SequenceMatcher ratio threshold for fuzzy vendor name matching against vendor_master.csv in src/vendor_match.py.",
   "vendor_match": {
     "fuzzy_threshold": 0.85
   },
+  
+  "_comment_duplicates": "Duplicate detection settings for R5b (historic) and R5a (batch semantic) in src/duplicates.py. amount_tolerance_pct and date_window_days govern R5b; cosine_threshold, quantity_match_threshold, and evidence_floor govern R5a. embedding_backend auto switches to sentence-transformers if installed, else char4gram-cosine.",
   "duplicates": {
     "cosine_threshold": 0.85,
     "amount_tolerance_pct": 2.0,
@@ -22,11 +33,14 @@
     "evidence_floor": 0.60,
     "embedding_backend": "auto"
   },
+  
+  "_comment_decide": "If true, generates reviewer rationales using Ollama for non-CLEAR invoices in src/decide.py.",
   "decide": {
     "ai_rationale": true
   },
+  
+  "_comment_enrichment": "If true, drafts plain-language exception notes and reviewer action messages in src/enrich.py.",
   "enrichment": {
     "author_messages": true
   }
 }
-

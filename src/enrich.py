@@ -66,7 +66,11 @@ MESSAGE_SCHEMA = {
 
 
 def note_tells(record: dict) -> list[dict]:
-    """Classify the free-text note (P14) into informational tells. Never blocks (F9)."""
+    """Classifies free-text notes into informational tells (e.g. VENDOR_RESUBMISSION). Never blocks.
+
+    Where called:
+        Called inside enrich_record().
+    """
     note = str(record.get("free_text_note") or "").strip()
     if not note:
         return []
@@ -81,16 +85,18 @@ def note_tells(record: dict) -> list[dict]:
 
 
 def blockers_of(record: dict) -> list[dict]:
-    """Rule results that stopped a CLEAR — the authoritative reasons for a message."""
+    """Filters rule results to only those with 'flag' or 'HOLD' status."""
     results = (record.get("rules") or {}).get("results") or []
     return [r for r in results if r.get("status") in ("flag", "HOLD")]
 
 
 def reason_codes_of(record: dict) -> list[str]:
+    """Returns list of active reason codes from non-CLEAR rule results."""
     return [r.get("reason_code") for r in blockers_of(record) if r.get("reason_code")]
 
 
 def next_action_for(reason_codes: list[str]) -> str:
+    """Looks up deterministic remediation instruction for the highest priority blocker code."""
     for code in reason_codes:
         if code in ACTION_BY_REASON:
             return ACTION_BY_REASON[code]
@@ -98,6 +104,7 @@ def next_action_for(reason_codes: list[str]) -> str:
 
 
 def amount_text(record: dict) -> str:
+    """Formats monetary amount string with currency code or notes unverified status."""
     total = record.get("total_trusted")
     currency = record.get("currency") or "EUR"
     if total is None:
@@ -106,7 +113,7 @@ def amount_text(record: dict) -> str:
 
 
 def duplicate_note(record: dict) -> str:
-    """One-line summary of duplicate evidence, for the human reading the message."""
+    """Summarises duplicate match findings into a concise string for reviewers."""
     parts: list[str] = []
     for r in (record.get("rules") or {}).get("results") or []:
         if r.get("rule_id") == "R5a" and r.get("status") == "flag":
@@ -118,6 +125,7 @@ def duplicate_note(record: dict) -> str:
 
 
 def _context_line(record: dict) -> str:
+    """Constructs header line with vendor ID, status, terms, and date."""
     master = record.get("vendor_master") or {}
     vendor_id = (record.get("vendor_match") or {}).get("vendor_id") or "no master record"
     bits = [str(record.get("vendor_name") or "?"), f"({vendor_id}"]
@@ -133,7 +141,11 @@ def _context_line(record: dict) -> str:
 
 
 def compose_message(record: dict) -> dict:
-    """Deterministic message template — the fallback when the local model is unavailable."""
+    """Builds deterministic fallback reviewer note when local LLM is offline or disabled.
+
+    Where called:
+        Called by author_message() as base structure and fallback.
+    """
     blockers = blockers_of(record)
     codes = [b["reason_code"] for b in blockers if b.get("reason_code")]
     action = next_action_for(codes)
@@ -167,6 +179,7 @@ def compose_message(record: dict) -> dict:
 
 
 def _message_prompt(record: dict, blockers: list[dict], channel: str, extra: str) -> str:
+    """Prepares user prompt containing invoice context and blockers for LLM authoring."""
     reasons = "\n".join(
         f"- {b.get('rule_id')} {b.get('reason_code')}: {b.get('detail')}"
         for b in blockers if b.get("reason_code")
@@ -187,12 +200,17 @@ def _message_prompt(record: dict, blockers: list[dict], channel: str, extra: str
 
 
 def author_message(record: dict, llm_cfg: dict | None = None) -> dict:
-    """Plain-language message: LLM-authored prose when reachable, template otherwise.
+    """Generates plain-language exception message via LLM or deterministic template.
 
-    The model writes `subject`/`body`; `reason_codes` and `next_action` always come from the rule
-    layer, so the actionable field stays deterministic even when the prose is imperfect (a 3B model
-    garbled one counterparty invoice number in testing). What the model proposed is kept as
-    `ai_next_action` for the audit trail.
+    Note:
+        The LLM drafts the explanatory prose (subject/body). The next_action field
+        remains strictly deterministic from ACTION_BY_REASON.
+
+    Where called:
+        Called inside enrich_record() for non-CLEAR invoices.
+
+    Where it sends information:
+        Saved into record['enrichment']['message'] and exported into exceptions.csv.
     """
     fallback = compose_message(record)
     if not llm_cfg:
@@ -230,7 +248,14 @@ def author_message(record: dict, llm_cfg: dict | None = None) -> dict:
 
 
 def enrich_record(record: dict, llm_cfg: dict | None = None, author: bool = True) -> dict:
-    """Attach note tells and (for non-CLEAR invoices) the plain-language message."""
+    """Enriches an invoice record with free-text note classifications and exception notes.
+
+    Where called:
+        Called by run.py in Pass 2 at Step S9.
+
+    Where it sends information:
+        Attached as record['enrichment']. Feeds exceptions.csv and report.html.
+    """
     disposition = (record.get("rules") or {}).get("disposition") or "CLEAR"
     message = author_message(record, llm_cfg) if (author and disposition != "CLEAR") else None
     return {"note_tells": note_tells(record), "message": message}

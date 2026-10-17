@@ -27,6 +27,7 @@ _COMPARED_FIELDS = (
 
 
 def _as_dec(value) -> Decimal | None:
+    """Safely coerces diverse numeric or string formats into Decimal."""
     if isinstance(value, Decimal):
         return value
     if isinstance(value, (int, float)):
@@ -37,12 +38,14 @@ def _as_dec(value) -> Decimal | None:
 
 
 def _money_close(a: Decimal | None, b: Decimal | None) -> bool:
+    """Checks whether two monetary amounts agree within MONEY_TOLERANCE (0.01)."""
     if a is None or b is None:
         return a is b
     return abs(a - b) <= MONEY_TOLERANCE
 
 
 def _field_agrees(field: str, ai_value, corrob_value) -> bool:
+    """Evaluates whether AI and regex extraction agree for a specific field name."""
     if field in ("subtotal", "vat_amount", "total"):
         return _money_close(_as_dec(ai_value), _as_dec(corrob_value))
     a = ai_value if not isinstance(ai_value, Decimal) else ai_value
@@ -55,7 +58,26 @@ def _field_agrees(field: str, ai_value, corrob_value) -> bool:
 
 
 def verify(record: dict, corroboration: dict | None = None) -> dict:
-    """Adds a `verification` block to the primary record; returns the same record."""
+    """Executes arithmetic verification, dual-read reconciliation, and line-wrap reconstruction.
+
+    Implements the core 'fail-closed' principle: publishes a 'total_trusted' ONLY if subtotal+vat
+    arithmetic balances AND both AI and regex reads agree on the inputs. Joins line-wrapped totals
+    (e.g., AlpinaDiesel 'TOTAL €4' + '2,121.24' -> 42121.24) and verifies individual line math.
+
+    Args:
+        record: Primary extracted record (from AI or regex fallback).
+        corroboration: Independent secondary read from regex engine.
+
+    Returns:
+        The updated invoice record enriched with a 'verification' block and 'total_trusted'.
+
+    Where called:
+        Called by run.py in Pass 1 immediately after extraction, and by tests/test_validate.py.
+
+    Where it sends information:
+        Populates 'total_trusted' on the record. This trusted total is consumed by fx.py (to_eur()),
+        rules.py (R3 threshold checks), and decide.py (flagging unverified totals for review).
+    """
     v: dict = {"ok": True, "failures": [], "review_flags": []}
 
     subtotal = _as_dec(record.get("subtotal"))
@@ -125,6 +147,7 @@ def verify(record: dict, corroboration: dict | None = None) -> dict:
             continue
         if abs(Decimal(str(qty)) * unit - amount) > MONEY_TOLERANCE:
             line_failures.append(idx)
+            continue
     v["line_math_ok"] = not line_failures
     v["line_math_failures"] = line_failures
     if line_failures:

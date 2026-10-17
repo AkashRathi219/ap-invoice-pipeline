@@ -467,12 +467,12 @@ def find_within_batch_pairs(
     evidence_floor: float = 0.60,
     max_services: int = 6,
 ) -> list[PairEvidence]:
-    """Evaluates Rule R5a: Two-Level Hierarchical Cross-Validation for Duplicate and Clone Fraud.
+    """Evaluates Rule R5a: Two-Tier Hierarchical Cross-Validation for Duplicate and Clone Fraud.
 
-    Level 1 (Intra-Category Primary): Invoices are clustered by vendor category from vendor_master.csv.
+    Tier 1 (Intra-Category): Invoices are clustered by vendor category from vendor_master.csv.
     Pairs within the same category are evaluated for like-for-like duplicate charges and clone packages.
 
-    Level 2 (Inter-Category & Unmapped Sentinel): Invoices from unapproved vendors (missing a master
+    Tier 2 (Inter-Category & Unmapped Sentinel): Invoices from unapproved vendors (missing a master
     category, e.g. LogiTrans) or cross-category anomalies are cross-scanned against all other records
     to catch rogue cross-domain billing and ghost fraud.
 
@@ -557,7 +557,7 @@ def find_within_batch_pairs(
             tier=tier,
         ))
 
-    # --- LEVEL 1: Intra-Category Deep Inspection (Primary Cluster) -------------
+    # --- TIER 1: Intra-Category Deep Inspection (Primary Cluster) --------------
     cat_buckets: dict[str, list[int]] = {}
     unmapped_indices: list[int] = []
     for idx, cat in enumerate(categories):
@@ -571,7 +571,7 @@ def find_within_batch_pairs(
             for j_pos in range(i_pos + 1, len(idxs)):
                 _evaluate_pair(idxs[i_pos], idxs[j_pos], "INTRA_CATEGORY")
 
-    # --- LEVEL 2: Unmapped & Cross-Category Sentinel (Rogue & Cross-Scan) ------
+    # --- TIER 2: Unmapped & Cross-Category Sentinel (Rogue & Cross-Scan) ------
     # 1. Unmapped / Unknown vendors (like LogiTrans) must be tested against ALL records
     for unmapped_idx in unmapped_indices:
         for other_idx in range(len(records)):

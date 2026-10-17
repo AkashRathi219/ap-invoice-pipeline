@@ -272,7 +272,7 @@ def test_verdict_falls_back_when_the_model_is_unavailable(monkeypatch):
 
 
 def test_two_tier_cross_validation_intra_category_provenance():
-    """Level 1 (Intra-Category) tags like-for-like vendor comparisons."""
+    """Tier 1 (Intra-Category) tags like-for-like vendor comparisons."""
     a = _record("INV-2025-03712", "FleetMech GmbH", "V004", "2025-06-10", SERVICES)
     b = _record("INV-2025-03791", "IberMaint S.L.", "V014", "2025-07-07", SERVICES)
     a["vendor_master"]["category"] = "Maintenance"
@@ -285,7 +285,7 @@ def test_two_tier_cross_validation_intra_category_provenance():
 
 
 def test_two_tier_cross_validation_unmapped_sentinel_catches_unknown_vendor():
-    """Level 2 (Unmapped Sentinel) cross-scans unknown/unclassified vendors across all records."""
+    """Tier 2 (Unmapped Sentinel) cross-scans unknown/unclassified vendors across all records."""
     a = _record("INV-2025-03760", "StationOps GmbH", "V010", "2025-06-22", SERVICES)
     b = _record("INV-2025-03955", "LogiTrans Express SRL", None, "2025-07-08", SERVICES)
     a["vendor_master"]["category"] = "Station Operations"

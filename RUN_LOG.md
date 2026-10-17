@@ -545,8 +545,8 @@ runs above, measured 2026-10-17.
 # B7 — Two-Tier Categorical Duplicate Engine (S8) — measured
 
 New architecture in `src/duplicates.py`:
-- **Level 1 (Intra-Category Primary)**: Invoices are clustered by `vendor_master.csv` `category` (`Fuel`, `Maintenance`, `Cleaning`, `Security`, etc.). Pairwise comparisons occur within the same domain, reducing compute by ~88% at scale. Emits `tier: "INTRA_CATEGORY"`.
-- **Level 2 (Inter-Category & Unmapped Sentinel)**: Invoices from unapproved vendors without a master category (such as `LogiTrans Express SRL`) or cross-category anomalies are cross-scanned against all records. Emits `tier: "UNMAPPED_SENTINEL"`.
+- **Tier 1 (Intra-Category)**: Invoices are clustered by `vendor_master.csv` `category` (`Fuel`, `Maintenance`, `Cleaning`, `Security`, etc.). Pairwise comparisons occur within the same domain, reducing compute by ~88% at scale. Emits `tier: "INTRA_CATEGORY"`.
+- **Tier 2 (Inter-Category & Unmapped Sentinel)**: Invoices from unapproved vendors without a master category (such as `LogiTrans Express SRL`) or cross-category anomalies are cross-scanned against all records. Emits `tier: "UNMAPPED_SENTINEL"`.
 
 ## Measured Results on the 17-Invoice Batch
 - **9 total pairs scored** (exactly 9, identical to baseline).

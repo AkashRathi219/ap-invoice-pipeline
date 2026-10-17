@@ -22,6 +22,9 @@
     "evidence_floor": 0.60,
     "embedding_backend": "auto"
   },
+  "decide": {
+    "ai_rationale": true
+  },
   "enrichment": {
     "author_messages": true
   }

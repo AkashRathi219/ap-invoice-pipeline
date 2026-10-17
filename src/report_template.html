@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f6f8; color: #101828;
+         font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+  .masthead { background: #101828; color: #fff; border-radius: 12px; padding: 22px 24px; }
+  .masthead h1 { margin: 0 0 4px; font-size: 20px; }
+  .masthead p { margin: 0; color: #cdd5df; font-size: 13px; }
+  .badge { display: inline-block; margin-top: 10px; padding: 3px 10px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; letter-spacing: .4px; }
+  .badge.ok { background: #12b76a; color: #06281a; }
+  .badge.warn { background: #f79009; color: #3a2503; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .card { flex: 1 1 140px; background: #fff; border: 1px solid #e4e7ec; border-radius: 10px;
+          padding: 12px 14px; }
+  .card .n { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .card .l { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #667085;
+             margin-top: 2px; }
+  .card.clear .n { color: #12b76a; }
+  .card.flag .n { color: #f79009; }
+  .card.hold .n { color: #f04438; }
+  section { background: #fff; border: 1px solid #e4e7ec; border-radius: 10px; padding: 16px 18px;
+            margin: 16px 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .7px; color: #344054;
+       margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eaecf0;
+           vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #667085;
+       background: #f9fafb; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { background: #f2f4f7; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px;
+          font-weight: 700; letter-spacing: .3px; }
+  .pill.CLEAR { background: #d1fadf; color: #05603a; }
+  .pill.FLAG-REVIEW { background: #fef0c7; color: #93370d; }
+  .pill.HOLD { background: #fee4e2; color: #912018; }
+  .risk-CRITICAL { color: #b42318; font-weight: 700; }
+  .risk-HIGH { color: #b54708; font-weight: 600; }
+  .risk-MEDIUM { color: #93610a; }
+  .why { color: #475467; font-size: 12.5px; }
+  .muted { color: #667085; font-size: 12px; }
+  footer { color: #667085; font-size: 12px; margin-top: 22px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <h1>{{TITLE}}</h1>
+    <p>{{SUBTITLE}}</p>
+    {{ORACLE_BADGE}}
+  </div>
+
+  <div class="cards">
+{{KPI_CARDS}}
+  </div>
+
+  <section>
+    <h2>What happened in this batch</h2>
+    <p class="why">{{SUMMARY}}</p>
+  </section>
+
+  <section>
+    <h2>Exception queue &mdash; review before approval ({{EXCEPTION_COUNT}})</h2>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Vendor</th><th>Disposition</th><th>Risk</th>
+            <th>Why</th><th>Next action</th></tr>
+      </thead>
+      <tbody>
+{{EXCEPTIONS_TABLE}}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Duplicate &amp; impostor evidence</h2>
+{{DUPLICATES_TABLE}}
+  </section>
+
+  <section>
+    <h2>Cleared for approval</h2>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Vendor</th><th>Vendor match</th><th>Stated total</th>
+            <th>Trusted total</th><th>Disposition</th></tr>
+      </thead>
+      <tbody>
+{{CLEARS_TABLE}}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>How AI was used in this batch</h2>
+{{AI_USAGE_TABLE}}
+  </section>
+
+  <footer>{{FOOTER}}</footer>
+</div>
+</body>
+</html>

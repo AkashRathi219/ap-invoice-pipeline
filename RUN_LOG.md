@@ -288,3 +288,97 @@ That repeat run is the reproducibility check: **trusted totals 14/17 Â· line-mat
 146/153 Â· 9 pairs published / 2 flagged Â· 0 historic flags Â· 6 LLM messages Â· CLEAR 11 Â· FLAG-REVIEW 3 Â·
 HOLD 3** â€” identical to the run above, with only latency differing.
 
+
+---
+
+# B4 — Decide (S10) · Outputs (S11) · Feedback loops (A5) — measured
+
+```text
+python run.py                          # full AI batch, measured below
+python run.py --no-ai                  # deterministic cross-check, measured below
+python run.py --out-dir sample_output  # same artefacts, anywhere on disk
+```
+
+## S10 — one decision object per invoice
+
+Every tell folds into one structured decision (`record["decision"]`), computed by
+`decide.decide_record` from the rule results alone — it re-derives the disposition rather than
+trusting a precomputed key, so a bare tell-set (the oracle fixture) grades identically to a full
+batch record.
+
+| Field | Measured example (AI run) |
+|---|---|
+| `disposition` / `queue` | `HOLD` / `HELD` (OldGuard), `FLAG-REVIEW` / `REVIEW_QUEUE` (CleanStation) |
+| `reason_codes` | `R1_inactive_vendor; R5a_clone_package` — verbatim from the rule layer |
+| `decision_reasons` | plain-language per blocker (R1 detail + R5a clone evidence) |
+| `risk_level` | `CRITICAL` — gate verdict; a `HOLD` without a clone grades `HIGH` |
+| `variant_tells` | `V1` format B / regex fallback · `V3` wrapped-or-disputed total · `V5` duplicate evidence · `V6` disposition class |
+| `next_action` | from `ACTION_BY_REASON` — deterministic even when the model garbled prose (B3 finding) |
+| `rationale` (A4) | LLM paragraph (`ap-decide-v1`) when Ollama reachable; template otherwise |
+
+**A4 measured:** all 6 non-CLEAR invoices carried an `ap-decide-v1` paragraph on the AI run
+(`source: llm`), and the template fallback covers every non-CLEAR invoice with `llm_cfg=None`
+(tests). One honest tell: for CleanStation the model paraphrased the evidence as "raises impostor
+risk" although no impostor verdict exists on that invoice — the paragraph is a draft for a human,
+and the disposition/reason codes it rides on are unaffected.
+
+## S11 — reviewer-facing artefacts (git-ignored `output/`, regenerated every run)
+
+| Artefact | Shape | Measured |
+|---|---|---|
+| `invoices_processed.csv` | 25 columns: fields, provenance, rule tells, decision, variant ids | 17 rows |
+| `exceptions.csv` | prioritised queue: HOLD ? FLAG-REVIEW, worst risk first; rule, link, evidence, next action, counterparty, message subject | AI 6 rows / --no-ai 5 rows |
+| `summary.md` | the AP lead brief: dispositions, exception table, held/flagged actions, cleared, duplicate evidence, AI usage, limitations | oracle verdict stated in-line |
+| `batch_report.json` | S10 envelopes (P-field record + payload + variant tells + runtime tells) + S11 run block + oracle verdict | 17 envelopes |
+| `audit_log.jsonl` | 1 `RUN_START` + 17 `INVOICE_DECIDED` events: sha256, model/prompt, tokens, agreement, decision, prose sources | 18 lines |
+| `report.html` | self-contained, no CDN, from `src/report_template.html` | oracle badge + exception queue + evidence + AI usage |
+
+CSVs are written UTF-8 **with BOM** (`utf-8-sig`) so vendor names (OÜ, Sp.z.o.o.) and `€/£` open
+correctly in Excel on Windows; `summary.md`, `report.html` and all JSON/JSONL are plain UTF-8.
+
+## The §5.3 oracle as a golden-file test — both paths
+
+The committed fixture `config/oracle_dispositions.json` states, per invoice, the rule outcomes that
+must produce the expected disposition.
+
+| Path | Dispositions | Oracle verdict |
+|---|---|---|
+| `python run.py` (AI primary) | **CLEAR 11 · FLAG-REVIEW 3 · HOLD 3** | **MATCH** — invoice-by-invoice |
+| `python run.py --no-ai` (regex fallback) | CLEAR 12 · FLAG-REVIEW 2 · HOLD 3 | DIFF — CleanStation clears (regex reads all totals) |
+
+The `--no-ai` DIFF is the documented regex-path expectation (B2/B3 finding), not a regression: the
+oracle grades the AI-primary path, where the wrapped CleanStation total refuses verification. The
+same fixture is also driven **offline** by `tests/test_decide.py` + `tests/test_summarize.py`
+(17 invoice-level golden tests + a full `verify_oracle` run) — the ladder is testable without any
+invoice data or LLM.
+
+## Feedback loops (A5) — measured on the AI run
+
+| Artefact | Measured | Note |
+|---|---|---|
+| `output/ai_telemetry.jsonl` | 17 rows, `ap-telemetry-v1` | now carries queue, risk, variant ids, `message_source`, `rationale_source`, `vendor_category`, `reviewer_feedback: null` (the HITL slot) |
+| `output/threshold_suggestions.json` | baseline 0.85 retained, 0 rejected flags | neutral without reviewer feedback; a REJECT of a flagged impostor raises that category's suggestion by +0.05 (cap 0.95) — a suggestion file, **never** a config rewrite |
+| `output/few_shot_bank.json` | 6 exemplars (1 IMPOSTOR_CLONE · HOLD · FLAG_REVIEW) | batch-derived; the committed **seed** stays at `config/few_shot_bank.json` so a fresh clone keeps a clean tree |
+| `output/fine_tuning_dataset.jsonl` | 10 Alpaca pairs (6 AP_DISPOSITION_REVIEW + 4 IMPOSTOR_ASSESSMENT) | ready for local LoRA SFT; no cloud cost |
+
+Reviewer actions are appendable offline: `feedback.record_feedback(path, events)` validates
+ACCEPT / REJECT / OVERRIDE and `read_feedback` replays them — no invoice data and no network.
+
+## Tests
+
+```
+python -m pytest -q        # 144 passed (88 existing + 56 new)
+```
+
+56 new offline tests: the golden-file oracle (17 invoice-level + full-set `verify_oracle`), ladder
+ownership (HOLD > FLAG-REVIEW > CLEAR, queue mapping, next actions), variant tells V1–V6, gate-owned
+risk level, A4 rationale fallback + verbatim reason codes in the prompt, artefact writers
+(CSV cells, audit shape, rendered HTML has no unrendered tokens), feedback loop A/B/C including the
+REJECT-driven threshold suggestion, and `decision_of` never mutating a record.
+
+## Noted environment variance
+
+Mean extraction latency on the measurement run was **4,876 ms/invoice** (B3 repeat runs 5,017 /
+5,086 ms — same model and prompt). The decision layer itself adds **6 `ap-decide-v1` calls**
+(˜ 4–6 s total) on the AI path and **zero** on `--no-ai`. Latency is quoted as measured, never as
+a specification.

@@ -1,0 +1,24 @@
+{
+  "source": "DATA_MAP_AND_BUILD_PLAN.md §5.3 — the 17-invoice expected-disposition oracle",
+  "note": "Golden-file fixture for the S10 decide ladder. Each entry lists the rule outcomes that must produce the expected disposition. Section 5.3's table lists 12 CLEAR / 2 FLAG-REVIEW; its stated totals are 11 / 3 / 3 — the stated totals are honoured here (CleanStation is FLAG-REVIEW because its total could not be verified by the dual read, so R3 fails closed with R3_amount_unavailable).",
+  "totals": {"CLEAR": 11, "FLAG-REVIEW": 3, "HOLD": 3},
+  "invoices": {
+    "INV-2025-03701": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03712": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03719": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03731": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03744": {"expected": "FLAG-REVIEW", "rules": {"R3": {"status": "flag", "reason_code": "R3_amount_unavailable"}}},
+    "INV-2025-03752": {"expected": "HOLD", "rules": {"R6": {"status": "HOLD", "reason_code": "R6_po_missing"}}},
+    "INV-2025-03760": {"expected": "FLAG-REVIEW", "rules": {"R5a": {"status": "flag", "reason_code": "R5a_clone_package"}}},
+    "INV-2025-03771": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03779": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03788": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03791": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03847": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-03880": {"expected": "HOLD", "rules": {"R1": {"status": "HOLD", "reason_code": "R1_inactive_vendor"}, "R5a": {"status": "flag", "reason_code": "R5a_clone_package"}}},
+    "INV-2025-03901": {"expected": "FLAG-REVIEW", "rules": {"R4": {"status": "flag", "reason_code": "R4_dual_approval_required"}, "R5a": {"status": "flag", "reason_code": "R5a_clone_package"}}},
+    "INV-2025-03955": {"expected": "HOLD", "rules": {"R1": {"status": "HOLD", "reason_code": "R1_unknown_vendor"}, "R5a": {"status": "flag", "reason_code": "R5a_clone_package"}}},
+    "INV-2025-SCAN-001": {"expected": "CLEAR", "rules": {}},
+    "INV-2025-SCAN-002": {"expected": "CLEAR", "rules": {}}
+  }
+}

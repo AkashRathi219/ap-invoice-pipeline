@@ -1,0 +1,6 @@
+# Flix AP — committed FX table (GBP / CHF / USD -> EUR), ECB-style, as-of date (P-E07).
+# rate_to_eur: 1 unit of `currency` == `rate_to_eur` EUR. Committed config = auditable, no silent drift.
+# Any currency without a committed row converts to nothing (fail closed) — never guessed.
+currency,rate_to_eur,as_of
+EUR,1.0,2025-06-30
+GBP,1.1719,2025-06-30

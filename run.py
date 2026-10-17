@@ -25,9 +25,12 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.extract_ai import extract_invoice_ai, extract_invoice_fallback_regex  # noqa: E402
 from src.extract_regex import ExtractionError, extract_invoice_regex, read_pdf_text  # noqa: E402
+from src.fx import fx_as_of, load_fx_table, to_eur  # noqa: E402
 from src.ingest import ingest  # noqa: E402
 from src.llm_provider import LLMBadOutput, LLMUnavailable, is_reachable, unload  # noqa: E402
+from src.rules import disposition, run_rules  # noqa: E402
 from src.validate_extract import verify  # noqa: E402
+from src.vendor_match import load_vendor_master, match_vendor  # noqa: E402
 
 
 def _json_default(obj):
@@ -68,6 +71,10 @@ def main() -> int:
     config = json.loads((REPO_ROOT / "config" / "pipeline_config.json").read_text(encoding="utf-8"))
     llm_cfg = config["llm"]
     expected = config["expected_invoice_count"]
+
+    fx_table = load_fx_table()
+    fx_as_of_date = fx_as_of()
+    vendor_master = load_vendor_master()
 
     data_dir = resolve_data_dir(args.data_dir)
     control = ingest(data_dir / "invoices", expected)
@@ -132,6 +139,31 @@ def main() -> int:
         records.append(record)
         v = record["verification"]
 
+        # B2 — vendor match + FX + rules. Thresholding uses ONLY the verified amount:
+        # an unverified total must never be cleared against a spend threshold (R3 fails closed).
+        vendor_match = match_vendor(record.get("vendor_name"), record.get("vendor_country"), vendor_master)
+        amount_eur, fx_evidence = to_eur(record.get("total_trusted"), record.get("currency"),
+                                         fx_table, fx_as_of_date)
+        rule_results = run_rules(record, vendor_match, amount_eur)
+        disp = disposition(rule_results)
+        record["vendor_match"] = {
+            "status": vendor_match.status,
+            "vendor_id": vendor_match.vendor_id,
+            "vendor_name_matched": vendor_match.vendor_name_matched,
+            "fuzzy_score": vendor_match.fuzzy_score,
+            "country_match": vendor_match.country_match,
+            "reasons": list(vendor_match.reasons),
+        }
+        record["fx"] = {
+            "currency": fx_evidence["currency"],
+            "amount_in_currency": fx_evidence["amount"],
+            "amount_eur": fx_evidence["amount_eur"],
+            "rate_to_eur": fx_evidence["rate"],
+            "as_of": fx_evidence["as_of"],
+            "fx_known": fx_evidence["fx_known"],
+        }
+        record["rules"] = {"results": rule_results, "disposition": disp}
+
         telemetry.append({
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "source_file": f.name,
@@ -145,6 +177,12 @@ def main() -> int:
             "line_math_ok": v.get("line_math_ok"),
             "agreement_score": v.get("agreement_score"),
             "review_flags": v.get("review_flags", []),
+            "vendor_id": record["vendor_match"]["vendor_id"],
+            "vendor_match_status": record["vendor_match"]["status"],
+            "amount_eur": record["fx"]["amount_eur"],
+            "fx_known": record["fx"]["fx_known"],
+            "disposition": disp,
+            "reason_codes": [r["reason_code"] for r in rule_results if r["reason_code"]],
         })
 
         inv = record.get("invoice_number") or "?"
@@ -162,7 +200,8 @@ def main() -> int:
         print(f"[{i:2}/{len(files)}] {f.name:<44} {inv:<18} {vendor:<22} "
               f"{str(total):>12} {cur:<4} math={'ok' if v['line_math_ok'] else 'FAIL'} "
               f"agr={v.get('agreement_score') or '-':>6} total={flag} "
-              f"{record.get('latency_ms') or 0}ms")
+              f"{record.get('latency_ms') or 0:>4}ms disp={record['rules']['disposition']} "
+              f"vnd={vendor_match.status} fx={fx_evidence['fx_known']}")
 
     # ---- outputs ------------------------------------------------------------
     out_dir = REPO_ROOT / "output"
@@ -199,6 +238,15 @@ def main() -> int:
           f"({100.0 * agreed / compared:.1f}%)" if compared else "agreement: n/a")
     if latencies:
         print(f"Mean AI latency: {mean_latency:.0f} ms/invoice")
+    dispositions: dict[str, int] = {}
+    for r in records:
+        d = (r.get("rules") or {}).get("disposition") or "CLEAR"
+        dispositions[d] = dispositions.get(d, 0) + 1
+    flagged = [r for r in records if (r.get("rules") or {}).get("disposition") != "CLEAR"]
+    print(f"Dispositions: {dispositions}")
+    for r in flagged:
+        reasons = [res.get("reason_code") for res in (r.get("rules") or {}).get("results") or [] if res.get("reason_code")]
+        print(f"  {r.get('source_file')}: {r.get('rules', {}).get('disposition')} — {'; '.join(reasons)}")
     print(f"Wrote: output/extraction_records.json · output/ai_telemetry.jsonl")
 
     # ---- free the model from RAM the moment computation stops (directive) ----

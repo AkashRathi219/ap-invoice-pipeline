@@ -82,3 +82,71 @@ python run.py
 RAM footprint per directive G9. A larger local model raises raw extraction accuracy with **no
 code change** — the verification layer, provenance, and refusal policy are unchanged. The
 pipeline is deliberately model-agnostic.
+
+---
+
+# B2 — FX · vendor match · rules (S4–S6) — measured
+
+New modules: `src/fx.py` · `src/vendor_match.py` · `src/rules.py` · `config/fx_rates.csv`.
+Every record now carries `vendor_match`, `fx`, and `rules` blocks in
+`output/extraction_records.json`; the console prints the disposition per invoice.
+
+## FX normalisation (L5)
+
+| Item | Measured |
+|---|---|
+| Committed table | `config/fx_rates.csv` — EUR 1.0 · GBP 1.1719 · as-of **2025-06-30** (P-E07) |
+| BritTech (the only non-EUR invoice) | GBP 4,998.00 → **€5,857.16** via rate 1.1719, as-of evidence attached |
+| Currencies without a committed rate | convert to **nothing** (`fx_known=false`) — never a guessed rate |
+| EUR invoices | identity conversion (rate 1.0), `fx_known=true` |
+
+## Vendor match (L1 → L2 → L3)
+
+| Item | Measured |
+|---|---|
+| Exact (normalised) | **16/17** — incl. `QuickFix OÜ` and `PolyClean Sp.z.o.o.` (Unicode + case folding) |
+| Unknown | **1/17** — `LogiTrans Express SRL` (no Romanian vendor in the master) |
+| Fuzzy path | **not exercised by this batch** — the invoice and master strings normalise to the *same* key, so L1 correctly wins; the diacritic-variant case (`QuickFix OÜ` vs `QuickFix OAo`, ratio 0.870 ≥ 0.85) is covered by `tests/test_vendor_match.py` |
+| Country corroboration | recorded per invoice (`country_match`); no conflicts in this batch |
+
+## Rules R1/R2/R3/R4/R6 (L1–L6) — dispositions
+
+| Disposition | Count | Records |
+|---|---|---|
+| **CLEAR** | **12** | the 11 oracle CLEARs + StationOps |
+| **FLAG-REVIEW** | **1** | SecureGuard (`R4_dual_approval_required`) |
+| **HOLD** | **4** | OldGuard (`R1_inactive_vendor`) · LogiTrans (`R1_unknown_vendor`) · SparkIT (`R6_po_missing`) · CleanStation (`R3_amount_unavailable`) |
+
+Every oracle rule fired on its oracle case and **nowhere else**:
+`R1` inactive → OldGuard, `R1` unknown → LogiTrans, `R4` → SecureGuard, `R6` → SparkIT,
+`R2` currency mismatch → none (every invoice currency is master-approved), `R3` above
+threshold → none (BritTech clears 20,000 only *after* FX: €5,857.16 ≤ €20,000).
+
+### Two deliberate deviations from the §5.3 oracle — and why
+
+1. **StationOps is CLEAR here, FLAG-REVIEW in the oracle.** Its oracle flag is the R5a
+   near-duplicate pair with LogiTrans — that is the `duplicates.py` increment (**B3**), not B2.
+2. **CleanStation is HOLD, not CLEAR.** Its total was one of the three *refused* by the
+   dual-read verification in B1 (the 3B model misread its numbers), so B2 has no trusted EUR
+   amount to compare against the 8,000 threshold and `R3` **fails closed** rather than clearing
+   on an unverified number. This is the designed behaviour of *"no unverified amount reaches an
+   approver"*; it reconciles at B4 when `decide.py` folds the verification flags into one ladder
+   (a stronger model removes the refusal entirely — no code change).
+
+## Tests
+
+```
+python -m pytest -q        # 61 passed
+```
+
+20 new offline tests: FX conversion + fail-closed (§ `test_fx.py`), exact/fuzzy/unknown vendor
+resolution (§ `test_vendor_match.py`), each rule's reason code + the disposition ladder
+(§ `test_rules.py`).
+
+## Noted environment variance
+
+Mean AI latency this run was **7,743 ms/invoice** (B1 measured 4,792 ms) with identical model and
+prompt — the box was running several full 17-file verification passes back-to-back during B2.
+Extraction, verification, and disposition results are unchanged across those runs; latency is
+quoted as measured, not as a specification.
+

@@ -41,6 +41,7 @@
 | **B4** | S10–S11 | `decide.py` · `summarize.py` · `feedback.py` · `report.html` template | full disposition set matches oracle · CSVs + summary + audit log + HTML report · telemetry + tuning dataset |
 | **B5** | S12 | `review.py` · `run.py` (`--review`) | interactive terminal review (ACCEPT / REJECT / OVERRIDE / SKIP / QUIT) · append-only `reviewer_feedback.jsonl` journal · auto-replay on subsequent runs · Loop A dynamic threshold tuning |
 | **B6** | S1–S2, S11 | `ingest.py` · `pipeline_config.json` · `summarize.py` | dataset-agnostic ingest (auto-detect vs strict count modes) · §5.3 oracle scoped to assessment batch (N/A on custom datasets) · 171 offline tests passing |
+| **B7** | S8 | `duplicates.py` · `pipeline_config.json` | **Two-Tier Categorical Duplicate Engine**: Layer 1 Intra-Category deep matching (scoped by `vendor_master.csv` category; ~88% compute reduction) + Layer 2 Unmapped Sentinel (cross-scanning unknown/unapproved vendors like LogiTrans) · category-specific threshold matrix |
 
 ---
 

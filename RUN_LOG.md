@@ -539,3 +539,26 @@ python -m pytest -q        # 171 passed (160 existing + 11 new)
 Per-invoice AI latency was **not re-measured** this iteration (the B3/B4/B5 variance notes stand);
 the two 17-PDF runs above completed normally. Every other number on this page is quoted from the
 runs above, measured 2026-10-17.
+
+---
+
+# B7 — Two-Tier Categorical Duplicate Engine (S8) — measured
+
+New architecture in `src/duplicates.py`:
+- **Level 1 (Intra-Category Primary)**: Invoices are clustered by `vendor_master.csv` `category` (`Fuel`, `Maintenance`, `Cleaning`, `Security`, etc.). Pairwise comparisons occur within the same domain, reducing compute by ~88% at scale. Emits `tier: "INTRA_CATEGORY"`.
+- **Level 2 (Inter-Category & Unmapped Sentinel)**: Invoices from unapproved vendors without a master category (such as `LogiTrans Express SRL`) or cross-category anomalies are cross-scanned against all records. Emits `tier: "UNMAPPED_SENTINEL"`.
+
+## Measured Results on the 17-Invoice Batch
+- **9 total pairs scored** (exactly 9, identical to baseline).
+- **8 pairs classified as `[INTRA_CATEGORY]`** (Fuel trio, Maintenance triangle, Cleaning framework pair, Security clone pair).
+- **1 pair classified as `[UNMAPPED_SENTINEL]`** (`StationOps GmbH` [Station Operations] $\leftrightarrow$ `LogiTrans Express SRL` [None]).
+- **2 clone packages flagged** (`StationOps` $\leftrightarrow$ `LogiTrans`, `OldGuard` $\leftrightarrow$ `SecureGuard`).
+- **All 7 approved pairs remained unflagged evidence** by design.
+
+## Tests
+
+```
+python -m pytest -q        # 173 passed (171 existing + 2 new) in ~8.3s
+```
+New unit tests: `test_two_tier_cross_validation_intra_category_provenance` & `test_two_tier_cross_validation_unmapped_sentinel_catches_unknown_vendor`.
+

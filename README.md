@@ -35,7 +35,7 @@ python run.py --only 03760    # Process one invoice by filename fragment
 python run.py --out-dir sample_output   # Write output artefacts anywhere
 python run.py --review        # After the run: interactive terminal review of the exception queue
 
-python -m pytest -q           # 171 offline tests — no live network/LLM needed
+python -m pytest -q           # 173 offline tests — no live network/LLM needed
 ```
 
 **The AI path needs a local Ollama** (`ollama pull llama3.2:3b`, then `ollama serve` — default
@@ -89,7 +89,7 @@ disposition.
 | **Currency validation** | invoice currency vs `approved_currency` → **FLAG-REVIEW** | no batch case (all vendors billed in their approved currency); covered by offline tests |
 | **Spend threshold** | EUR-normalised amount vs `spend_threshold_eur` → **FLAG-REVIEW** | BritTech £4,998 → **€5,857.16** (rate 1.1719, as-of 2025-06-30) passes under its 20k threshold *with FX evidence attached* |
 | **Dual approval** | `requires_dual_approval` → route for two approvers | SecureGuard €18,499.50 **flagged** for dual routing |
-| **Duplicate detection** | vs `historic_invoices.csv` (±2% ∧ 30-day window) + whole-batch semantic layer | **0 historic duplicates** — the planted history contains recurring-but-benign services, quoted as scored evidence, not flags; **2 within-batch impostor pairs flagged** (see below) |
+| **Duplicate detection** | vs `historic_invoices.csv` (±2% ∧ 30-day window) + two-tier whole-batch semantic layer (intra-category pairs + unmapped-vendor sentinel) | **0 historic duplicates** — the planted history contains recurring-but-benign services, quoted as scored evidence, not flags; **2 within-batch impostor pairs flagged** (see below) |
 | **Mandatory fields** | PO number (and presence checks) missing → **HOLD pending completion** | SparkIT held — no PO reference |
 
 **The duplicates the batch actually plants are cross-vendor impostor pairs**, and they are the
@@ -98,6 +98,10 @@ OldGuard ↔ SecureGuard (same 2 services, 168.2%, active/inactive split). Both 
 cosine 1.000, quantity match 1.00 and a uniform price ratio as evidence; flagged pairs get a
 structured forensic verdict from the local model — whose grade may **raise** the severity but can
 never lower it (it graded both clones LOW; the arithmetic gate kept CRITICAL).
+The comparison itself is two-tiered: Tier 1 pairs invoices inside the same `vendor_master.csv`
+category (8 of the 9 published pairs), Tier 2 cross-scans vendors with no master record against
+the whole batch (the 1 pair that catches LogiTrans) — same flags as a flat all-pairs scan,
+at a fraction of the comparisons.
 
 **The full disposition set** (AI path): 3 HOLD — OldGuard (inactive), LogiTrans (unknown), SparkIT
 (no PO) · 3 FLAG-REVIEW — CleanStation (total refuses dual-read verification → fail-closed),
@@ -194,7 +198,7 @@ all outputs, all thresholds. `python run.py --no-ai` runs the entire chain with 
 |---|---|---|
 | LLM runtime | **Ollama** · `llama3.2:3b` · temperature 0 · JSON-schema-constrained | fully local, no API key, free |
 | PDF text | **PyMuPDF (fitz)** | parses these malformed PDFs cleanly (page-wrapped totals included) |
-| Tests | **pytest** | 171 offline tests; the oracle doubles as the golden fixture |
+| Tests | **pytest** | 173 offline tests; the oracle doubles as the golden fixture |
 | Similarity | stdlib `char4gram-cosine` (default) · `sentence-transformers` opt-in | zero heavy deps on the core path; the assignment's reference embeddings remain an upgrade, not a requirement |
 | Everything else | Python stdlib | `csv` · `difflib` · `decimal` (money is never float) · `urllib` (Ollama over stdlib HTTP) · `hashlib` |
 
@@ -205,7 +209,7 @@ all outputs, all thresholds. `python run.py --no-ai` runs the entire chain with 
 | `run.py` | the pipeline, S1–S11 + the `--review` terminal review, one command |
 | `src/` | one module per owned link/rule (`DEVELOPMENT_PLAN.md` §3 maps file → step) |
 | `config/` | committed config: thresholds, FX rates, **the oracle**, few-shot seed |
-| `tests/` | 171 offline tests |
+| `tests/` | 173 offline tests |
 | `RUN_LOG.md` | **measured results at consumption** — the only place numbers live |
 | `DEVELOPMENT_PLAN.md` | plan of record + status log (SPEC → PLAN → BUILD → TEST → REVIEW → SHIP) |
 | `sample_output/` | the committed result of the provided batch |

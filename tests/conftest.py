@@ -8,7 +8,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-DATA_DIR = REPO_ROOT.parent / "ap-automation-assessment"
+DATA_DIR = REPO_ROOT / "ap-automation-assessment"
+if not (DATA_DIR / "invoices").is_dir():
+    DATA_DIR = REPO_ROOT.parent / "ap-automation-assessment"
 
 
 def _require_data_dir() -> Path:

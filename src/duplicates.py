@@ -43,11 +43,11 @@ from .llm_provider import LLMBadOutput, LLMUnavailable, chat_json
 FORENSIC_PROMPT_VERSION = "ap-forensic-v1"
 
 DEFAULT_HISTORIC_PATH = (
-    Path(__file__).resolve().parents[2] / "ap-automation-assessment" / "historic_invoices.csv"
+    Path(__file__).resolve().parents[1] / "ap-automation-assessment" / "historic_invoices.csv"
 )
 if not DEFAULT_HISTORIC_PATH.exists():
     DEFAULT_HISTORIC_PATH = (
-        Path(__file__).resolve().parents[1] / "ap-automation-assessment" / "historic_invoices.csv"
+        Path(__file__).resolve().parents[2] / "ap-automation-assessment" / "historic_invoices.csv"
     )
 
 SEVERITY = {"PROCESSED": 1, "APPROVED": 2, "PAID": 3}

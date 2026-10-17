@@ -19,9 +19,7 @@ from decimal import Decimal
 from pathlib import Path
 
 FUZZY_THRESHOLD_DEFAULT = 0.85
-DEFAULT_MASTER_PATH = Path(__file__).resolve().parents[1].resolve().parent / "ap-automation-assessment" / "vendor_master.csv"
-if not DEFAULT_MASTER_PATH.exists():
-    DEFAULT_MASTER_PATH = Path(__file__).resolve().parents[1] / "ap-automation-assessment" / "vendor_master.csv"
+DEFAULT_MASTER_PATH = Path(__file__).resolve().parents[1] / "ap-automation-assessment" / "vendor_master.csv"
 if not DEFAULT_MASTER_PATH.exists():
     DEFAULT_MASTER_PATH = Path(__file__).resolve().parents[2] / "ap-automation-assessment" / "vendor_master.csv"
 

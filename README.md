@@ -17,23 +17,24 @@ dispositions** · 2 impostor pairs flagged (cosine 1.000, quantities 1.00, price
 ## 1. Quick start
 
 ```bash
-# 0. Python 3.11+ (measured on 3.13)
+# 0. Clone and install dependencies (Python 3.11+; measured on 3.13)
+git clone https://github.com/AkashRathi219/ap-invoice-pipeline.git
+cd ap-invoice-pipeline
 pip install -r requirements.txt          # PyMuPDF + pytest — nothing else
 
-# 1. Put the starter pack beside this repo (or inside it, or point at it)
-#    works out of the box when this layout holds:
-#    ap-invoice-pipeline/            <- this repo
-#    ap-automation-assessment/       <- github.com/viz-explorer/ap-automation-assessment
-#    Alternatives: copy the starter pack into ./input, or pass --data-dir, or set AP_DATA_DIR.
+# 1. Input Data: Self-Contained and Pre-Bundled
+#    The assessment dataset (17 PDFs, vendor_master.csv, historic_invoices.csv)
+#    is bundled directly inside ./ap-automation-assessment so it runs out of the box!
+#    (Alternatively: pass --data-dir <path> or set AP_DATA_DIR to point to another folder)
 
 # 2. Run
-python run.py                 # AI-primary path — needs a local Ollama (see below)
-python run.py --no-ai         # the full chain with zero AI — deterministic fallback path
-python run.py --limit 5       # quick demo: first N invoices
-python run.py --only 03760    # one invoice by filename fragment
-python run.py --out-dir sample_output   # write the artefacts anywhere
+python run.py                 # AI-primary path — needs local Ollama (see below)
+python run.py --no-ai         # Full pipeline with zero AI — deterministic fallback path
+python run.py --limit 5       # Quick demo: process first N invoices
+python run.py --only 03760    # Process one invoice by filename fragment
+python run.py --out-dir sample_output   # Write output artefacts anywhere
 
-python -m pytest -q           # 144 offline tests — no invoice data, no network needed
+python -m pytest -q           # 145 offline tests — no live network/LLM needed
 ```
 
 **The AI path needs a local Ollama** (`ollama pull llama3.2:3b`, then `ollama serve` — default

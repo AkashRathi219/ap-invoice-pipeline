@@ -1,0 +1,26 @@
+vendor_id,vendor_name,category,payment_terms_days,approved_currency,spend_threshold_eur,status,country,contact_email,requires_dual_approval
+V001,EuroFuel GmbH,Fuel,30,EUR,45000,ACTIVE,Germany,billing@eurofuel.de,FALSE
+V002,AlpinaDiesel AG,Fuel,30,EUR,50000,ACTIVE,Austria,invoices@alpinadiesel.at,FALSE
+V003,TotalRoute S.A.,Fuel,45,EUR,40000,ACTIVE,France,ap@totalroute.fr,FALSE
+V004,FleetMech GmbH,Maintenance,45,EUR,30000,ACTIVE,Germany,accounts@fleetmech.de,FALSE
+V005,AutoServ S.R.L.,Maintenance,60,EUR,25000,ACTIVE,Italy,finance@autoserv.it,FALSE
+V006,BritTech Solutions Ltd,IT Services,30,GBP,20000,ACTIVE,United Kingdom,billing@brittech.co.uk,FALSE
+V007,SecureGuard AG,Security,45,EUR,35000,ACTIVE,Switzerland,invoices@secureguard.ch,TRUE
+V008,CleanStation S.A.,Cleaning,30,EUR,8000,ACTIVE,Belgium,ap@cleanstation.be,FALSE
+V009,SparkIT BV,IT Services,30,EUR,18000,ACTIVE,Netherlands,billing@sparkit.nl,FALSE
+V010,StationOps GmbH,Station Operations,45,EUR,22000,ACTIVE,Germany,finance@stationops.de,FALSE
+V011,LegalEdge S.A.,Legal,60,EUR,15000,ACTIVE,Luxembourg,invoices@legaledge.lu,FALSE
+V012,MediaBoost GmbH,Marketing,30,EUR,12000,ACTIVE,Germany,billing@mediaboost.de,FALSE
+V013,NordClean ApS,Cleaning,30,EUR,7000,ACTIVE,Denmark,ap@nordclean.dk,FALSE
+V014,IberMaint S.L.,Maintenance,45,EUR,28000,ACTIVE,Spain,finance@ibermaint.es,FALSE
+V015,QuickFix OÜ,Maintenance,30,EUR,10000,ACTIVE,Estonia,billing@quickfix.ee,FALSE
+V016,PolyClean Sp.z.o.o.,Cleaning,30,EUR,6000,ACTIVE,Poland,ap@polyclean.pl,FALSE
+V017,DataSphere SAS,IT Services,30,EUR,16000,ACTIVE,France,invoices@datasphere.fr,FALSE
+V018,OldGuard Security NV,Security,45,EUR,20000,INACTIVE,Belgium,finance@oldguard.be,FALSE
+V019,AlphaMark GmbH,Marketing,30,EUR,9000,ACTIVE,Austria,billing@alphamark.at,FALSE
+V020,LexCounsel GmbH,Legal,60,CHF,14000,ACTIVE,Switzerland,ap@lexcounsel.ch,FALSE
+V021,DepotServ S.R.L.,Station Operations,45,EUR,18000,INACTIVE,Romania,invoices@depotserv.ro,FALSE
+V022,NovaTech BV,IT Services,30,EUR,21000,ACTIVE,Netherlands,billing@novatech.nl,FALSE
+V023,GreenClean GmbH,Cleaning,30,EUR,5000,ACTIVE,Germany,finance@greenclean.de,FALSE
+V024,OldFuel S.A.,Fuel,30,EUR,35000,INACTIVE,France,ap@oldfuel.fr,FALSE
+V025,SafeStation GmbH,Station Operations,45,EUR,17000,ACTIVE,Germany,billing@safestation.de,FALSE

@@ -61,9 +61,9 @@ def resolve_data_dir(data_dir: str | None = None) -> Path:
     if os.environ.get("AP_DATA_DIR"):
         candidates.append(Path(os.environ["AP_DATA_DIR"]))
     candidates += [
+        REPO_ROOT / "ap-automation-assessment",
         REPO_ROOT / "input",
         REPO_ROOT.parent / "ap-automation-assessment",
-        REPO_ROOT / "ap-automation-assessment",
     ]
     for candidate in candidates:
         if (candidate / "invoices").is_dir() and (candidate / "vendor_master.csv").is_file():
@@ -264,35 +264,82 @@ def main(argv: list[str] | None = None) -> int:
                        if ((r.get("enrichment") or {}).get("message") or {}).get("source") == "llm")
 
     print()
-    print(f"Records: {len(records)} · verified totals {trusted}/{len(records)} · "
-          f"within-batch pairs {len(pairs)} ({len(flagged_pairs)} flagged) · "
-          f"messages {llm_messages} · similarity {embedder.name}")
-    print(f"Dispositions: CLEAR {totals.get('CLEAR', 0)} · FLAG-REVIEW "
-          f"{totals.get('FLAG-REVIEW', 0)} · HOLD {totals.get('HOLD', 0)}")
+    print("=" * 95)
+    print(" BATCH EXECUTION & DISPOSITION SUMMARY")
+    print("=" * 95)
+    print(f"Records Ingested : {len(records)} | Verified Totals: {trusted}/{len(records)} | "
+          f"Within-Batch Pairs: {len(pairs)} ({len(flagged_pairs)} flagged)")
+    print(f"Dispositions     : CLEAR {totals.get('CLEAR', 0)} · "
+          f"FLAG-REVIEW {totals.get('FLAG-REVIEW', 0)} · HOLD {totals.get('HOLD', 0)}")
     if oracle_result["ok"]:
         expected = oracle_result["expected_totals"]
-        print(f"Oracle §5.3: MATCH (CLEAR {expected.get('CLEAR')} · "
+        print(f"Oracle Status    : MATCH (CLEAR {expected.get('CLEAR')} · "
               f"FLAG-REVIEW {expected.get('FLAG-REVIEW')} · HOLD {expected.get('HOLD')})")
     else:
-        print(f"Oracle §5.3: DIFF — measured {oracle_result['measured_totals']} vs expected "
+        print(f"Oracle Status    : DIFF — measured {oracle_result['measured_totals']} vs expected "
               f"{oracle_result['expected_totals']}")
         for mismatch in oracle_result["mismatches"]:
-            print(f"    {mismatch['invoice_number']}: expected {mismatch['expected']}, "
+            print(f"    Mismatch -> {mismatch['invoice_number']}: expected {mismatch['expected']}, "
                   f"measured {mismatch['measured']}")
         if oracle_result["missing_invoices"]:
-            print(f"    not processed: {', '.join(oracle_result['missing_invoices'])}")
+            print(f"    Not processed: {', '.join(oracle_result['missing_invoices'])}")
+
+    print()
+    print("=" * 95)
+    print(" PRIORITISED EXCEPTION QUEUE & REASON CODES")
+    print("=" * 95)
+    print(f"{'#':<3} {'STATUS':<12} {'INVOICE':<19} {'VENDOR':<24} {'REASON CODES'}")
+    print("-" * 95)
+    for idx, record in enumerate(exceptions, 1):
+        decision = summarize.decision_of(record)
+        reasons_str = "; ".join(decision.get("reason_codes") or [])
+        print(f"{idx:<3} {str(decision.get('disposition')):<12} {str(record.get('invoice_number')):<19} "
+              f"{str(record.get('vendor_name')):<24} {reasons_str}")
+        
+        # Interactive diagnostics breakdown per exception
+        blockers = decision.get("blockers") or []
+        for b in blockers:
+            print(f"    -> [{b.get('rule_id')}] {b.get('detail')}")
+        if decision.get("next_action"):
+            print(f"    -> Action: {decision.get('next_action')}")
+        counter = summarize._counterparty(record)
+        if counter:
+            print(f"    -> Matched Counterparty: {counter}")
+        print()
+
+    # Aggregate Root-Cause Error Summary
+    error_counts: dict[str, int] = {}
     for record in exceptions:
         decision = summarize.decision_of(record)
-        print(f"  {str(decision.get('disposition')):<11} {str(record.get('invoice_number')):<18} "
-              f"{str(record.get('vendor_name')):<24} {'; '.join(decision.get('reason_codes') or [])}")
-    print(f"Wrote: {out_dir}")
+        for code in decision.get("reason_codes") or []:
+            error_counts[code] = error_counts.get(code, 0) + 1
+
+    print("=" * 95)
+    print(" ROOT-CAUSE ERROR & EXCEPTION DISTRIBUTION")
+    print("=" * 95)
+    for code, count in sorted(error_counts.items(), key=lambda x: -x[1]):
+        rule_desc = {
+            "R1_unknown_vendor": "Vendor not found in vendor master (unapproved supplier)",
+            "R1_inactive_vendor": "Vendor marked INACTIVE in master record",
+            "R3_amount_unavailable": "Dual-read disagreement / unverified numeric total",
+            "R4_dual_approval_required": "Vendor spend policy mandates secondary sign-off",
+            "R5a_clone_package": "Cross-invoice duplicate/impostor service clone detected",
+            "R5b_exact_duplicate": "Invoice ID or PO overlap with 12-month historical data",
+            "R5b_near_duplicate": "Near-identical amount & date proximity in historical data",
+            "R6_po_missing": "Mandatory PO reference missing on document",
+        }.get(code, "Business rule violation")
+        print(f"  * {code:<28} : {count} invoice(s) -- {rule_desc}")
+    print("-" * 95)
+
+    print()
+    print(f"Wrote Artefacts to: {out_dir}")
     for key in ("summary.md", "exceptions.csv", "invoices_processed.csv", "report.html",
                 "batch_report.json", "audit_log.jsonl", "ai_telemetry.jsonl",
                 "fine_tuning_dataset.jsonl", "threshold_suggestions.json"):
         print(f"  - {key}")
 
     if ai_available and not args.keep_loaded and unload(llm_cfg["model"], llm_cfg["base_url"]):
-        print(f"Model unloaded from memory: {llm_cfg['model']}")
+        print(f"\nModel unloaded from memory: {llm_cfg['model']}")
 
     return 0
 

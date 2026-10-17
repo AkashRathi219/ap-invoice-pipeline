@@ -87,16 +87,17 @@ makes malformed JSON a near-impossible event; the regex fallback keeps the pipel
 
 ## 5. REVIEW — checklist before ship
 
-- [ ] Clone-and-run on a **clean path** (no absolute D:\ dependencies) · Windows + one POSIX check
-- [ ] UTF-8: vendor names (`OÜ`, `Sp.z.o.o.`), `€`/`£` render in CSV + HTML + console
-- [ ] Every AI claim in README demonstrable from committed output (TRA-03: *demo it or remove it*)
-- [ ] Honest limitations list (§8 of CASE_STUDY_PLAN) matches measured reality
-- [ ] No input data baked into code/config
+- [x] Clone-and-run on a **clean path** (no absolute D:\ dependencies) — data dir resolved relatively (`../ap-automation-assessment` · `input\` · `AP_DATA_DIR` · `--data-dir`); Windows measured · POSIX behaviour by construction (pathlib + UTF-8 + LF), named as unmeasured in README §7
+- [x] UTF-8: vendor names (`OÜ`, `Sp.z.o.o.`), `€`/`£` render in CSV + HTML + console — CSVs written UTF-8 with BOM (`utf-8-sig`) for Excel; verified in `sample_output/`
+- [x] Every AI claim in README demonstrable from committed output (TRA-03: *demo it or remove it*) — README numbers (14/17 trusted · 146/153 · 11/3/3 · 6+6 LLM prose · 2 pairs 69.2%/168.2%) verified against `sample_output/` batch_report + telemetry
+- [x] Honest limitations list (§8 of CASE_STUDY_PLAN) matches measured reality — README §7 quotes measured noise + the `--no-ai` path difference + the unmeasured-POSIX tell
+- [x] No input data baked into code/config — thresholds and rates committed as config; invoice data only ever in `output/` / `sample_output/`
 
 ## 6. SHIP — checklist
 
-- [ ] `sample_output/` = actual run on the provided batch · README (approach, decisions, limitations, tools)
-- [ ] `RUN_LOG.md` = measured results at consumption · push to `github.com/akashrathi219/ap-invoice-pipeline`
+- [x] `sample_output/` = actual run on the provided batch — landed (fresh AI run, oracle MATCH, regenerated artifacts incl. `extraction_records.json`)
+- [x] README (approach, decisions, limitations, tools) — landed with setup instructions sufficient for reviewer-alone execution
+- [ ] push to `github.com/akashrathi219/ap-invoice-pipeline` — ⬜ the last step
 - [ ] Public repo renders; clean-clone verified
 
 ---
@@ -110,3 +111,4 @@ makes malformed JSON a near-impossible event; the regex fallback keeps the pipel
 | 2026-10-17 | B2 BUILD | `fx.py` + committed `config/fx_rates.csv` (GBP 1.1719, as-of 2025-06-30) · `vendor_match.py` (L1 exact 16/17 · L2 fuzzy path tested · L3 country) · `rules.py` (R1/R2/R3/R4/R6 + CLEAR/FLAG-REVIEW/HOLD ladder) · wired into `run.py` per-record + console · **20 new offline tests (61 total) green** · BritTech **£4,998 → €5,857.16** · dispositions **CLEAR 12 · FLAG-REVIEW 1 · HOLD 4**, every oracle rule on its oracle case only · 2 named deviations (StationOps R5a → B3, CleanStation fail-closed) in `RUN_LOG.md` |
 | 2026-10-17 | B3 BUILD | `duplicates.py` (R5b vendor-scoped metadata + R5a embedding/quantity/counterparty gate + `ap-forensic-v1` verdict, deterministic fallback) · `enrich.py` (note tells + AI-authored messages, template fallback) · `rules.py` R3→review-flag, R2→skip when no master record · `run.py` refactored to **two passes** (extract/verify/link → batch duplicate layer → ladder + messages) · **27 new offline tests (88 total) green** · R5a **9 pairs published, 2 flagged** (both planted pairs cosine 1.000/qty 1.00, price 69.2% & 168.2%) · R5b **0 exact · 0 flagged**, 3 recurring rows in-tolerance/out-of-window quoted as evidence · fuel + maintenance + cleaning clusters (4 pairs at cosine 1.000) stay unflagged · model graded both clones **LOW** → gate keeps **CRITICAL** (`ai_risk_level` kept as advisory) · 6 messages (6 LLM · 0 template) · dispositions **CLEAR 11 · FLAG-REVIEW 3 · HOLD 3 = oracle stated totals** · §5.3 table/totals discrepancy documented · numbers in `RUN_LOG.md` |
 | 2026-10-17 | B4 BUILD | `decide.py` (**one decision object**: disposition/queue/reasons/blockers/gate-owned risk/variant tells V1–V6/next action + A4 rationale `ap-decide-v1`, read-only, template fallback; re-derives disposition from rule results — grades a bare tell-set identically) · `summarize.py` + `report_template.html` (**6 artefacts**: invoices/exceptions CSVs · summary.md · batch_report.json · audit_log.jsonl · report.html) · `feedback.py` (**3 HITL loops**: `ap-telemetry-v1` with HITL slot · Loop A threshold suggestions +0.05 on reviewer REJECT, never rewrites config · Loop B few-shot bank seed in config, batch-derived in output · Loop C 10 Alpaca SFT pairs) · committed oracle fixture `config/oracle_dispositions.json` · **56 new offline tests (144 total) green incl. 17 invoice-level golden oracle tests** · AI run dispositions **CLEAR 11 · FLAG-REVIEW 3 · HOLD 3 → oracle MATCH** (invoice-by-invoice) · `--no-ai` **CLEAR 12 · 2 · HOLD 3 → documented DIFF** · A4 measured 6/6 LLM paragraphs · 6 artefacts regenerated every run, clean clone-and-run tree · numbers in `RUN_LOG.md` |
+| 2026-10-17 | SHIP PREP | Assignment coverage pass: every §Submission deliverable verified against results · **`README.md` landed** (approach · setup-alone instructions · 8 named decisions · rule-by-rule measured table · AI-usage guardrails · 9 honest limitations incl. the unmeasured-POSIX + no-R2-case tells · tools) · **`sample_output/` landed** from a fresh AI run (11/3/3 → oracle MATCH · 14/17 trusted · agreement 146/153 · 6+6 LLM prose · README numbers verified against the committed sample) · REVIEW checklist 5/5 ticked · push remains the only SHIP item · commits `d90824a` + `97fb60d` precede this row |

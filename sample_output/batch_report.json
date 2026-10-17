@@ -1,0 +1,890 @@
+{
+  "step_id": "S11",
+  "phase": "OUTPUTS",
+  "generated_at": "2026-10-17T09:11:58+00:00",
+  "run": {
+    "model": "llama3.2:3b",
+    "prompt_version": "ap-extract-v1",
+    "temperature": 0.0,
+    "similarity_backend": "char4gram-cosine",
+    "ai_available": true,
+    "control_record": {
+      "found": 17,
+      "expected": 17,
+      "invoices_dir": "D:\\opencode\\resume\\03_Flix_BA_Automation_AI_Gurugram\\case study\\ap-automation-assessment\\invoices",
+      "processed": 17
+    }
+  },
+  "dispositions": {
+    "CLEAR": 11,
+    "FLAG-REVIEW": 3,
+    "HOLD": 3
+  },
+  "oracle": {
+    "ok": true,
+    "expected_totals": {
+      "CLEAR": 11,
+      "FLAG-REVIEW": 3,
+      "HOLD": 3
+    },
+    "measured_totals": {
+      "CLEAR": 11,
+      "FLAG-REVIEW": 3,
+      "HOLD": 3
+    },
+    "mismatches": [],
+    "missing_invoices": [],
+    "source": "DATA_MAP_AND_BUILD_PLAN.md §5.3 — the 17-invoice expected-disposition oracle"
+  },
+  "invoices": [
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03701",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "EuroFuel GmbH",
+        "P3_invoice_number": "INV-2025-03701",
+        "P4_date": "2025-06-05",
+        "P6_po_number": "PO-55210",
+        "P7_subtotal": "7186.28",
+        "P8_vat": "1365.39",
+        "P9_total": "8551.67",
+        "P11_trusted_total": "8551.67",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03712",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "FleetMech GmbH",
+        "P3_invoice_number": "INV-2025-03712",
+        "P4_date": "2025-06-10",
+        "P6_po_number": "PO-55221",
+        "P7_subtotal": "5714.28",
+        "P8_vat": "1085.71",
+        "P9_total": "6799.99",
+        "P11_trusted_total": "6799.99",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03719",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "AutoServ S.R.L.",
+        "P3_invoice_number": "INV-2025-03719",
+        "P4_date": "2025-06-12",
+        "P6_po_number": "PO-55228",
+        "P7_subtotal": "4537.82",
+        "P8_vat": "862.19",
+        "P9_total": "5400.01",
+        "P11_trusted_total": "5400.01",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03731",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "BritTech Solutions Ltd",
+        "P3_invoice_number": "INV-2025-03731",
+        "P4_date": "2025-06-20",
+        "P6_po_number": "PO-55241",
+        "P7_subtotal": "4200.0",
+        "P8_vat": "798.0",
+        "P9_total": "4998.0",
+        "P11_trusted_total": "4998.00",
+        "P12_currency": "GBP",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V4",
+          "variant_class": "FX_VARIANT",
+          "ai_highlight": "FX tells",
+          "error_observed": "GBP invoice — FX to EUR",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": null
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03744",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "CleanStation S.A.",
+        "P3_invoice_number": "INV-2025-03744",
+        "P4_date": "2025-06-14",
+        "P6_po_number": "PO-55255",
+        "P7_subtotal": "2687.07",
+        "P8_vat": "510.92",
+        "P9_total": "3199.99",
+        "P11_trusted_total": "",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "FLAG-REVIEW",
+        "queue": "REVIEW_QUEUE",
+        "review_required": true,
+        "reason_codes": [
+          "R3_amount_unavailable"
+        ],
+        "decision_reasons": [
+          "R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read)"
+        ],
+        "risk_level": "MEDIUM"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "document total disagrees with arithmetic authority",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class FLAG-REVIEW",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03752",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "SparkIT BV",
+        "P3_invoice_number": "INV-2025-03752",
+        "P4_date": "2025-06-17",
+        "P6_po_number": null,
+        "P7_subtotal": "6",
+        "P8_vat": "1",
+        "P9_total": "7",
+        "P11_trusted_total": "",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "HOLD",
+        "queue": "HELD",
+        "review_required": true,
+        "reason_codes": [
+          "R3_amount_unavailable",
+          "R6_po_missing"
+        ],
+        "decision_reasons": [
+          "R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read)",
+          "R6: no PO reference on INV-2025-03752"
+        ],
+        "risk_level": "HIGH"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "document total disagrees with arithmetic authority",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class HOLD",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": null
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03760",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "StationOps GmbH",
+        "P3_invoice_number": "INV-2025-03760",
+        "P4_date": "2025-06-22",
+        "P6_po_number": "PO-55263",
+        "P7_subtotal": "8412.15",
+        "P8_vat": "1598.31",
+        "P9_total": "10010.4",
+        "P11_trusted_total": "10010.46",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "FLAG-REVIEW",
+        "queue": "REVIEW_QUEUE",
+        "review_required": true,
+        "reason_codes": [
+          "R5a_clone_package"
+        ],
+        "decision_reasons": [
+          "R5a: LogiTrans Express SRL (unknown vendor (no master record)) invoices the same 3 services as StationOps GmbH with matching quantities (match 1.00); unit prices at 69.2% of StationOps GmbH's — clone-package evidence"
+        ],
+        "risk_level": "CRITICAL"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "line-wrapped total in the text layer",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "cross-vendor impostor pair (clone-package evidence)",
+          "severity": "critical",
+          "tolerance": "tolerance AND date-window"
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class FLAG-REVIEW",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03771",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "MediaBoost GmbH",
+        "P3_invoice_number": "INV-2025-03771",
+        "P4_date": "2025-06-25",
+        "P6_po_number": "PO-55274",
+        "P7_subtotal": "3791.61",
+        "P8_vat": "720.41",
+        "P9_total": "4512.02",
+        "P11_trusted_total": "4512.02",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": null
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03779",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "NordClean ApS",
+        "P3_invoice_number": "INV-2025-03779",
+        "P4_date": "2025-07-03",
+        "P6_po_number": "PO-55282",
+        "P7_subtotal": "2436.98",
+        "P8_vat": "463.03",
+        "P9_total": "2900.01",
+        "P11_trusted_total": "2900.01",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03788",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "AlpinaDiesel AG",
+        "P3_invoice_number": "INV-2025-03788",
+        "P4_date": "2025-06-18",
+        "P6_po_number": "PO-55290",
+        "P7_subtotal": "35396.0",
+        "P8_vat": "6725.24",
+        "P9_total": "4221.24",
+        "P11_trusted_total": "42121.24",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "line-wrapped total in the text layer",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03791",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "IberMaint S.L.",
+        "P3_invoice_number": "INV-2025-03791",
+        "P4_date": "2025-07-07",
+        "P6_po_number": "PO-55298",
+        "P7_subtotal": "6890.76",
+        "P8_vat": "1309.24",
+        "P9_total": "8200.0",
+        "P11_trusted_total": "8200.00",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03847",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "TotalRoute S.A.",
+        "P3_invoice_number": "INV-2025-03847",
+        "P4_date": "2025-07-02",
+        "P6_po_number": "PO-55344",
+        "P7_subtotal": "4863.96",
+        "P8_vat": "924.15",
+        "P9_total": "5788.11",
+        "P11_trusted_total": "5788.11",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "shared descriptions within the batch",
+          "severity": "low",
+          "tolerance": "scored evidence"
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03880",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "OldGuard Security NV",
+        "P3_invoice_number": "INV-2025-03880",
+        "P4_date": "2025-07-05",
+        "P6_po_number": "PO-55370",
+        "P7_subtotal": "9244.19",
+        "P8_vat": "1756.4",
+        "P9_total": "11000.5",
+        "P11_trusted_total": "11000.59",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "HOLD",
+        "queue": "HELD",
+        "review_required": true,
+        "reason_codes": [
+          "R1_inactive_vendor",
+          "R5a_clone_package"
+        ],
+        "decision_reasons": [
+          "R1: vendor V018 status INACTIVE",
+          "R5a: SecureGuard AG (ACTIVE) invoices the same 2 services as OldGuard Security NV with matching quantities (match 1.00); unit prices at 168.2% of OldGuard Security NV's — clone-package evidence"
+        ],
+        "risk_level": "CRITICAL"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "line-wrapped total in the text layer",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "cross-vendor impostor pair (clone-package evidence)",
+          "severity": "critical",
+          "tolerance": "tolerance AND date-window"
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class HOLD",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03901",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "SecureGuard AG",
+        "P3_invoice_number": "INV-2025-03901",
+        "P4_date": "2025-07-01",
+        "P6_po_number": "PO-55388",
+        "P7_subtotal": "15545.8",
+        "P8_vat": "2953.7",
+        "P9_total": "18499.5",
+        "P11_trusted_total": "18499.50",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "FLAG-REVIEW",
+        "queue": "REVIEW_QUEUE",
+        "review_required": true,
+        "reason_codes": [
+          "R4_dual_approval_required",
+          "R5a_clone_package"
+        ],
+        "decision_reasons": [
+          "R4: dual approval required for V007",
+          "R5a: SecureGuard AG (ACTIVE) invoices the same 2 services as OldGuard Security NV with matching quantities (match 1.00); unit prices at 168.2% of OldGuard Security NV's — clone-package evidence"
+        ],
+        "risk_level": "CRITICAL"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "cross-vendor impostor pair (clone-package evidence)",
+          "severity": "critical",
+          "tolerance": "tolerance AND date-window"
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class FLAG-REVIEW",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-03955",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "LogiTrans Express SRL",
+        "P3_invoice_number": "INV-2025-03955",
+        "P4_date": "2025-07-08",
+        "P6_po_number": "PO-55410",
+        "P7_subtotal": "58234.8",
+        "P8_vat": "111046.6",
+        "P9_total": "6929.94",
+        "P11_trusted_total": "",
+        "P12_currency": "EUR",
+        "P14_format": "A"
+      },
+      "payload": {
+        "disposition": "HOLD",
+        "queue": "HELD",
+        "review_required": true,
+        "reason_codes": [
+          "R1_unknown_vendor",
+          "R3_amount_unavailable",
+          "R5a_clone_package"
+        ],
+        "decision_reasons": [
+          "R1: vendor 'LogiTrans Express SRL' not in master",
+          "R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read)",
+          "R5a: LogiTrans Express SRL (unknown vendor (no master record)) invoices the same 3 services as StationOps GmbH with matching quantities (match 1.00); unit prices at 69.2% of StationOps GmbH's — clone-package evidence"
+        ],
+        "risk_level": "CRITICAL"
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V3",
+          "variant_class": "ARITHMETIC_VARIANT",
+          "ai_highlight": "Arithmetic authority",
+          "error_observed": "document total disagrees with arithmetic authority",
+          "severity": "critical",
+          "tolerance": 0
+        },
+        {
+          "variant_id": "V5",
+          "variant_class": "DUPLICATE_VARIANT",
+          "ai_highlight": "Scored evidence",
+          "error_observed": "cross-vendor impostor pair (clone-package evidence)",
+          "severity": "critical",
+          "tolerance": "tolerance AND date-window"
+        },
+        {
+          "variant_id": "V6",
+          "variant_class": "DECISION_VARIANT",
+          "ai_highlight": "Decision tells",
+          "error_observed": "disposition class HOLD",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": "char4gram-cosine"
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-SCAN-001",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "QuickFix OÜ",
+        "P3_invoice_number": "INV-2025-SCAN-001",
+        "P4_date": "2025-07-04",
+        "P6_po_number": "PO-55398",
+        "P7_subtotal": "1350.0",
+        "P8_vat": "256.5",
+        "P9_total": "1606.5",
+        "P11_trusted_total": "1606.50",
+        "P12_currency": "EUR",
+        "P14_format": "B"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V1",
+          "variant_class": "FORMAT_VARIANT",
+          "ai_highlight": "Format class detected",
+          "error_observed": "scanned / variant label layout (format class B)",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": null
+      }
+    },
+    {
+      "step_id": "S10",
+      "phase": "DECIDE",
+      "invoice_id": "INV-2025-SCAN-002",
+      "status": "DONE",
+      "record": {
+        "P1_vendor": "PolyClean Sp.z.o.o.",
+        "P3_invoice_number": "INV-2025-SCAN-002",
+        "P4_date": "2025-07-06",
+        "P6_po_number": "PO-55403",
+        "P7_subtotal": "1730.0",
+        "P8_vat": "328.7",
+        "P9_total": "2058.7",
+        "P11_trusted_total": "2058.70",
+        "P12_currency": "EUR",
+        "P14_format": "B"
+      },
+      "payload": {
+        "disposition": "CLEAR",
+        "queue": "APPROVER_QUEUE",
+        "review_required": false,
+        "reason_codes": [],
+        "decision_reasons": [
+          "all rules passed — released to the approver queue"
+        ],
+        "risk_level": null
+      },
+      "variant_tells": [
+        {
+          "variant_id": "V1",
+          "variant_class": "FORMAT_VARIANT",
+          "ai_highlight": "Format class detected",
+          "error_observed": "scanned / variant label layout (format class B)",
+          "severity": "high",
+          "tolerance": 0
+        }
+      ],
+      "runtime_tells": {
+        "model": "llama3.2:3b",
+        "prompt_version": "ap-extract-v1",
+        "extraction_layer": "ai_primary",
+        "similarity_backend": null
+      }
+    }
+  ]
+}

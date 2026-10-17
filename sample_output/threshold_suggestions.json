@@ -1,0 +1,8 @@
+{
+  "baseline_cosine_threshold": 0.85,
+  "rejected_flags": 0,
+  "categories": {},
+  "note": "no reviewer feedback recorded yet — baseline retained; this file is a suggestion and never rewrites config/pipeline_config.json",
+  "generated_at": "2026-10-17T09:11:58+00:00",
+  "version": "ap-threshold-tuning-v1"
+}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AP Invoice Batch — Review Report</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f6f8; color: #101828;
+         font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+  .masthead { background: #101828; color: #fff; border-radius: 12px; padding: 22px 24px; }
+  .masthead h1 { margin: 0 0 4px; font-size: 20px; }
+  .masthead p { margin: 0; color: #cdd5df; font-size: 13px; }
+  .badge { display: inline-block; margin-top: 10px; padding: 3px 10px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; letter-spacing: .4px; }
+  .badge.ok { background: #12b76a; color: #06281a; }
+  .badge.warn { background: #f79009; color: #3a2503; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .card { flex: 1 1 140px; background: #fff; border: 1px solid #e4e7ec; border-radius: 10px;
+          padding: 12px 14px; }
+  .card .n { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .card .l { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #667085;
+             margin-top: 2px; }
+  .card.clear .n { color: #12b76a; }
+  .card.flag .n { color: #f79009; }
+  .card.hold .n { color: #f04438; }
+  section { background: #fff; border: 1px solid #e4e7ec; border-radius: 10px; padding: 16px 18px;
+            margin: 16px 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .7px; color: #344054;
+       margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eaecf0;
+           vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #667085;
+       background: #f9fafb; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { background: #f2f4f7; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px;
+          font-weight: 700; letter-spacing: .3px; }
+  .pill.CLEAR { background: #d1fadf; color: #05603a; }
+  .pill.FLAG-REVIEW { background: #fef0c7; color: #93370d; }
+  .pill.HOLD { background: #fee4e2; color: #912018; }
+  .risk-CRITICAL { color: #b42318; font-weight: 700; }
+  .risk-HIGH { color: #b54708; font-weight: 600; }
+  .risk-MEDIUM { color: #93610a; }
+  .why { color: #475467; font-size: 12.5px; }
+  .muted { color: #667085; font-size: 12px; }
+  footer { color: #667085; font-size: 12px; margin-top: 22px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <h1>AP Invoice Batch — Review Report</h1>
+    <p>Batch of 17 invoices · CLEAR 11 · FLAG-REVIEW 3 · HOLD 3 · verified totals 14/17 · generated 2026-10-17T09:11:58+00:00</p>
+    <span class="badge ok">ORACLE MATCH — CLEAR 11 · FLAG-REVIEW 3 · HOLD 3</span>
+  </div>
+
+  <div class="cards">
+<div class="card clear"><div class="n">11</div><div class="l">CLEAR</div></div><div class="card flag"><div class="n">3</div><div class="l">FLAG-REVIEW</div></div><div class="card hold"><div class="n">3</div><div class="l">HOLD</div></div><div class="card"><div class="n">14/17</div><div class="l">verified totals</div></div>
+  </div>
+
+  <section>
+    <h2>What happened in this batch</h2>
+    <p class="why">17 invoices were read and validated before reaching an approver. 6 need a human: 3 held (a mandatory condition failed) and 3 flagged for review. 11 cleared and are ready for the approver queue. Arithmetic verified 14/17 totals; a wrapped or disputed total is never passed as trusted. Start with INV-2025-03880 (OldGuard Security NV) — Confirm the vendor is reactivated in the master before payment.</p>
+  </section>
+
+  <section>
+    <h2>Exception queue &mdash; review before approval (6)</h2>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Vendor</th><th>Disposition</th><th>Risk</th>
+            <th>Why</th><th>Next action</th></tr>
+      </thead>
+      <tbody>
+<tr><td><code>INV-2025-03880</code></td><td>OldGuard Security NV</td><td><span class="pill HOLD">HOLD</span></td><td class="risk-CRITICAL">CRITICAL</td><td class="why">R1: vendor V018 status INACTIVE; R5a: SecureGuard AG (ACTIVE) invoices the same 2 services as OldGuard Security NV with matching quantities (match 1.00); unit prices at 168.2% of OldGuard Security NV&#x27;s — clone-package evidence</td><td class="why">Confirm the vendor is reactivated in the master before payment.</td></tr>
+<tr><td><code>INV-2025-03955</code></td><td>LogiTrans Express SRL</td><td><span class="pill HOLD">HOLD</span></td><td class="risk-CRITICAL">CRITICAL</td><td class="why">R1: vendor &#x27;LogiTrans Express SRL&#x27; not in master; R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read); R5a: LogiTrans Express SRL (unknown vendor (no master record)) invoices the same 3 services as StationOps GmbH with matching quantities (match 1.00); unit prices at 69.2% of StationOps GmbH&#x27;s — clone-package evidence</td><td class="why">Add the vendor to the master (or reject the invoice) before any payment.</td></tr>
+<tr><td><code>INV-2025-03752</code></td><td>SparkIT BV</td><td><span class="pill HOLD">HOLD</span></td><td class="risk-HIGH">HIGH</td><td class="why">R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read); R6: no PO reference on INV-2025-03752</td><td class="why">Re-read the total (the two readers disagreed) or obtain the vendor&#x27;s PDF confirmation.</td></tr>
+<tr><td><code>INV-2025-03760</code></td><td>StationOps GmbH</td><td><span class="pill FLAG-REVIEW">FLAG-REVIEW</span></td><td class="risk-CRITICAL">CRITICAL</td><td class="why">R5a: LogiTrans Express SRL (unknown vendor (no master record)) invoices the same 3 services as StationOps GmbH with matching quantities (match 1.00); unit prices at 69.2% of StationOps GmbH&#x27;s — clone-package evidence</td><td class="why">Verify with the requesting department that this is not a duplicate charge before paying.</td></tr>
+<tr><td><code>INV-2025-03901</code></td><td>SecureGuard AG</td><td><span class="pill FLAG-REVIEW">FLAG-REVIEW</span></td><td class="risk-CRITICAL">CRITICAL</td><td class="why">R4: dual approval required for V007; R5a: SecureGuard AG (ACTIVE) invoices the same 2 services as OldGuard Security NV with matching quantities (match 1.00); unit prices at 168.2% of OldGuard Security NV&#x27;s — clone-package evidence</td><td class="why">Collect the second approver&#x27;s sign-off before payment.</td></tr>
+<tr><td><code>INV-2025-03744</code></td><td>CleanStation S.A.</td><td><span class="pill FLAG-REVIEW">FLAG-REVIEW</span></td><td class="risk-MEDIUM">MEDIUM</td><td class="why">R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read)</td><td class="why">Re-read the total (the two readers disagreed) or obtain the vendor&#x27;s PDF confirmation.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Duplicate &amp; impostor evidence</h2>
+<tr><td>EuroFuel GmbH ↔ TotalRoute S.A.</td><td class="num">1.0</td><td class="num">0.7806</td><td class="num">100.0%</td><td>SHARED_DESCRIPTIONS_DIFFERENT_QUANTITY</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>EuroFuel GmbH ↔ AlpinaDiesel AG</td><td class="num">0.8886</td><td class="num">0.513</td><td class="num">100.0%</td><td>SHARED_DESCRIPTIONS_DIFFERENT_QUANTITY</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>FleetMech GmbH ↔ AutoServ S.R.L.</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">79.4%</td><td>SHARED_PACKAGE_APPROVED_VENDORS</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>FleetMech GmbH ↔ IberMaint S.L.</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">120.6%</td><td>SHARED_PACKAGE_APPROVED_VENDORS</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>AutoServ S.R.L. ↔ IberMaint S.L.</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">151.8%</td><td>SHARED_PACKAGE_APPROVED_VENDORS</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>CleanStation S.A. ↔ NordClean ApS</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">90.6%</td><td>SHARED_PACKAGE_APPROVED_VENDORS</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>StationOps GmbH ↔ LogiTrans Express SRL</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">69.2%</td><td>CLONE_PACKAGE_BLOCKED_VENDOR</td><td>FLAG</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>AlpinaDiesel AG ↔ TotalRoute S.A.</td><td class="num">0.8886</td><td class="num">0.1318</td><td class="num">100.0%</td><td>SHARED_DESCRIPTIONS_DIFFERENT_QUANTITY</td><td>evidence</td></tr><table><thead><tr><th>Pair</th><th>cosine</th><th>qty match</th><th>unit price B/A</th><th>pattern</th><th>verdict</th></tr></thead><tbody>
+<tr><td>OldGuard Security NV ↔ SecureGuard AG</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">168.2%</td><td>CLONE_PACKAGE_BLOCKED_VENDOR</td><td>FLAG</td></tr></tbody></table>
+  </section>
+
+  <section>
+    <h2>Cleared for approval</h2>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Vendor</th><th>Vendor match</th><th>Stated total</th>
+            <th>Trusted total</th><th>Disposition</th></tr>
+      </thead>
+      <tbody>
+<tr><td><code>INV-2025-03701</code></td><td>EuroFuel GmbH</td><td>exact</td><td class="num">8,551.67</td><td class="num">8,551.67</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03712</code></td><td>FleetMech GmbH</td><td>exact</td><td class="num">6,799.99</td><td class="num">6,799.99</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03719</code></td><td>AutoServ S.R.L.</td><td>exact</td><td class="num">5,400.01</td><td class="num">5,400.01</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03731</code></td><td>BritTech Solutions Ltd</td><td>exact</td><td class="num">4,998.00</td><td class="num">4,998.00</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03771</code></td><td>MediaBoost GmbH</td><td>exact</td><td class="num">4,512.02</td><td class="num">4,512.02</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03779</code></td><td>NordClean ApS</td><td>exact</td><td class="num">2,900.01</td><td class="num">2,900.01</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03788</code></td><td>AlpinaDiesel AG</td><td>exact</td><td class="num">4,221.24</td><td class="num">42,121.24</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03791</code></td><td>IberMaint S.L.</td><td>exact</td><td class="num">8,200.00</td><td class="num">8,200.00</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-03847</code></td><td>TotalRoute S.A.</td><td>exact</td><td class="num">5,788.11</td><td class="num">5,788.11</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-SCAN-001</code></td><td>QuickFix OÜ</td><td>exact</td><td class="num">1,606.50</td><td class="num">1,606.50</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+<tr><td><code>INV-2025-SCAN-002</code></td><td>PolyClean Sp.z.o.o.</td><td>exact</td><td class="num">2,058.70</td><td class="num">2,058.70</td><td><span class="pill CLEAR">CLEAR</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>How AI was used in this batch</h2>
+<table><tbody><tr><th>Extraction (AI primary read)</th><td>ai_primary: 17</td></tr><tr><th>Model / prompt</th><td>llama3.2:3b / ap-extract-v1</td></tr><tr><th>Similarity backend</th><td>char4gram-cosine</td></tr><tr><th>Impostor forensic verdicts (LLM)</th><td>4</td></tr><tr><th>Exception messages (LLM prose)</th><td>6</td></tr><tr><th>Decision rationales (LLM prose)</th><td>6</td></tr><tr><th>Temperature</th><td>0.0</td></tr></tbody></table>
+  </section>
+
+  <footer>Generated locally by the AP invoice pipeline. No invoice data leaves this machine; the deterministic decision ladder is the only authority.</footer>
+</div>
+</body>
+</html>

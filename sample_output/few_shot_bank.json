@@ -1,0 +1,37 @@
+{
+  "version": "ap-few-shot-v1",
+  "generated_at": "2026-10-17T09:11:58+00:00",
+  "notes": [],
+  "exemplars": [
+    {
+      "kind": "FLAG_REVIEW",
+      "input": "CleanStation S.A. · reasons ['R3_amount_unavailable']",
+      "output": "R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read)"
+    },
+    {
+      "kind": "HOLD",
+      "input": "SparkIT BV · reasons ['R3_amount_unavailable', 'R6_po_missing']",
+      "output": "R3: readers disagree on the total — no verified EUR amount to compare against the threshold (approver reviews the read); R6: no PO reference on INV-2025-03752"
+    },
+    {
+      "kind": "IMPOSTOR_CLONE",
+      "input": "cross-vendor pair StationOps GmbH / LogiTrans Express SRL cosine=1.0 qty_match=1.0 unit_price_ratio=0.6922",
+      "output": "CRITICAL · CLONE · disposition FLAG-REVIEW"
+    },
+    {
+      "kind": "IMPOSTOR_CLONE",
+      "input": "cross-vendor pair OldGuard Security NV / SecureGuard AG cosine=1.0 qty_match=1.0 unit_price_ratio=1.6817",
+      "output": "CRITICAL · CLONE · disposition HOLD"
+    },
+    {
+      "kind": "IMPOSTOR_CLONE",
+      "input": "cross-vendor pair OldGuard Security NV / SecureGuard AG cosine=1.0 qty_match=1.0 unit_price_ratio=1.6817",
+      "output": "CRITICAL · CLONE · disposition FLAG-REVIEW"
+    },
+    {
+      "kind": "IMPOSTOR_CLONE",
+      "input": "cross-vendor pair StationOps GmbH / LogiTrans Express SRL cosine=1.0 qty_match=1.0 unit_price_ratio=0.6922",
+      "output": "CRITICAL · CLONE · disposition HOLD"
+    }
+  ]
+}

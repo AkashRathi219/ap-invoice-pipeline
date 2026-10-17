@@ -433,6 +433,7 @@ class PairEvidence:
     flagged: bool
     backend: str
     paired_services: list[dict]
+    tier: str = "INTRA_CATEGORY"
 
     def to_dict(self) -> dict:
         return {
@@ -453,6 +454,7 @@ class PairEvidence:
             "flagged": self.flagged,
             "embedding_backend": self.backend,
             "paired_services": self.paired_services,
+            "tier": self.tier,
         }
 
 
@@ -465,10 +467,14 @@ def find_within_batch_pairs(
     evidence_floor: float = 0.60,
     max_services: int = 6,
 ) -> list[PairEvidence]:
-    """Evaluates Rule R5a: Cross-invoice semantic duplicate and fraud impostor detection across the batch.
+    """Evaluates Rule R5a: Two-Level Hierarchical Cross-Validation for Duplicate and Clone Fraud.
 
-    Flags pairs satisfying the full clone signature:
-    cross_vendor ∧ cosine >= 0.85 ∧ equal lines ∧ qty_match >= 0.95 ∧ counterparty not payment-eligible.
+    Level 1 (Intra-Category Primary): Invoices are clustered by vendor category from vendor_master.csv.
+    Pairs within the same category are evaluated for like-for-like duplicate charges and clone packages.
+
+    Level 2 (Inter-Category & Unmapped Sentinel): Invoices from unapproved vendors (missing a master
+    category, e.g. LogiTrans) or cross-category anomalies are cross-scanned against all other records
+    to catch rogue cross-domain billing and ghost fraud.
 
     Where called:
         Called by run.py in Pass 2 across all extracted batch records.
@@ -480,68 +486,105 @@ def find_within_batch_pairs(
     emb = embedder or Embedder()
     vectors = [emb.encode(description_document(r)) for r in records]
     items = [service_line_items(r) for r in records]
+    categories = [(r.get("vendor_master") or {}).get("category") for r in records]
+    
     pairs: list[PairEvidence] = []
+    seen_pairs: set[tuple[int, int]] = set()
 
-    for i in range(len(records)):
-        if not items[i]:
-            continue
-        for j in range(i + 1, len(records)):
-            if not items[j]:
-                continue
-            score = cosine(vectors[i], vectors[j])
-            if score < evidence_floor:
-                continue
-            aligned = align_line_items(items[i], items[j])
-            q_match = quantity_match(aligned)
-            counts_equal = len(items[i]) == len(items[j])
-            risky_a, label_a = counterparty_risk(records[i])
-            risky_b, label_b = counterparty_risk(records[j])
-            cross_vendor = vendor_key(records[i]) != vendor_key(records[j])
-            risky = risky_a or risky_b
+    def _evaluate_pair(i: int, j: int, tier: str):
+        key = (min(i, j), max(i, j))
+        if key in seen_pairs:
+            return
+        seen_pairs.add(key)
 
-            clone_signature = (
-                cross_vendor
-                and score >= cosine_threshold
-                and counts_equal
-                and q_match >= quantity_match_threshold
-            )
-            flagged = bool(clone_signature and risky)
-            if flagged:
-                pattern = "CLONE_PACKAGE_BLOCKED_VENDOR"
-            elif clone_signature:
-                pattern = "SHARED_PACKAGE_APPROVED_VENDORS"
-            elif score >= cosine_threshold:
-                pattern = "SHARED_DESCRIPTIONS_DIFFERENT_QUANTITY"
-            else:
-                pattern = "SHARED_DESCRIPTIONS"
+        if not items[i] or not items[j]:
+            return
 
-            services = [
-                {
-                    "description": str(a.get("description") or ""),
-                    "qty_a": a.get("qty"), "qty_b": b.get("qty"),
-                    "unit_a": a.get("unit_price"), "unit_b": b.get("unit_price"),
-                }
-                for a, b in aligned[:max_services]
-            ]
-            pairs.append(PairEvidence(
-                a_invoice=_invoice_label(records[i]),
-                b_invoice=_invoice_label(records[j]),
-                a_vendor=str(records[i].get("vendor_name") or "?"),
-                b_vendor=str(records[j].get("vendor_name") or "?"),
-                a_vendor_id=(records[i].get("vendor_match") or {}).get("vendor_id"),
-                b_vendor_id=(records[j].get("vendor_match") or {}).get("vendor_id"),
-                a_standing=label_a,
-                b_standing=label_b,
-                cross_vendor=cross_vendor,
-                description_cosine=score,
-                quantity_match=q_match,
-                line_count_equal=counts_equal,
-                unit_price_ratio=unit_price_ratio(aligned),
-                pattern=pattern,
-                flagged=flagged,
-                backend=emb.name,
-                paired_services=services,
-            ))
+        score = cosine(vectors[i], vectors[j])
+        if score < evidence_floor:
+            return
+
+        aligned = align_line_items(items[i], items[j])
+        q_match = quantity_match(aligned)
+        counts_equal = len(items[i]) == len(items[j])
+        risky_a, label_a = counterparty_risk(records[i])
+        risky_b, label_b = counterparty_risk(records[j])
+        cross_vendor = vendor_key(records[i]) != vendor_key(records[j])
+        risky = risky_a or risky_b
+
+        clone_signature = (
+            cross_vendor
+            and score >= cosine_threshold
+            and counts_equal
+            and q_match >= quantity_match_threshold
+        )
+        flagged = bool(clone_signature and risky)
+        if flagged:
+            pattern = "CLONE_PACKAGE_BLOCKED_VENDOR"
+        elif clone_signature:
+            pattern = "SHARED_PACKAGE_APPROVED_VENDORS"
+        elif score >= cosine_threshold:
+            pattern = "SHARED_DESCRIPTIONS_DIFFERENT_QUANTITY"
+        else:
+            pattern = "SHARED_DESCRIPTIONS"
+
+        services = [
+            {
+                "description": str(a.get("description") or ""),
+                "qty_a": a.get("qty"), "qty_b": b.get("qty"),
+                "unit_a": a.get("unit_price"), "unit_b": b.get("unit_price"),
+            }
+            for a, b in aligned[:max_services]
+        ]
+        pairs.append(PairEvidence(
+            a_invoice=_invoice_label(records[i]),
+            b_invoice=_invoice_label(records[j]),
+            a_vendor=str(records[i].get("vendor_name") or "?"),
+            b_vendor=str(records[j].get("vendor_name") or "?"),
+            a_vendor_id=(records[i].get("vendor_match") or {}).get("vendor_id"),
+            b_vendor_id=(records[j].get("vendor_match") or {}).get("vendor_id"),
+            a_standing=label_a,
+            b_standing=label_b,
+            cross_vendor=cross_vendor,
+            description_cosine=score,
+            quantity_match=q_match,
+            line_count_equal=counts_equal,
+            unit_price_ratio=unit_price_ratio(aligned),
+            pattern=pattern,
+            flagged=flagged,
+            backend=emb.name,
+            paired_services=services,
+            tier=tier,
+        ))
+
+    # --- LEVEL 1: Intra-Category Deep Inspection (Primary Cluster) -------------
+    cat_buckets: dict[str, list[int]] = {}
+    unmapped_indices: list[int] = []
+    for idx, cat in enumerate(categories):
+        if cat:
+            cat_buckets.setdefault(cat, []).append(idx)
+        else:
+            unmapped_indices.append(idx)
+
+    for cat, idxs in cat_buckets.items():
+        for i_pos in range(len(idxs)):
+            for j_pos in range(i_pos + 1, len(idxs)):
+                _evaluate_pair(idxs[i_pos], idxs[j_pos], "INTRA_CATEGORY")
+
+    # --- LEVEL 2: Unmapped & Cross-Category Sentinel (Rogue & Cross-Scan) ------
+    # 1. Unmapped / Unknown vendors (like LogiTrans) must be tested against ALL records
+    for unmapped_idx in unmapped_indices:
+        for other_idx in range(len(records)):
+            if unmapped_idx != other_idx:
+                _evaluate_pair(unmapped_idx, other_idx, "UNMAPPED_SENTINEL")
+
+    # 2. Cross-category scan across known categories
+    cat_list = list(cat_buckets.keys())
+    for c1_idx in range(len(cat_list)):
+        for c2_idx in range(c1_idx + 1, len(cat_list)):
+            for i in cat_buckets[cat_list[c1_idx]]:
+                for j in cat_buckets[cat_list[c2_idx]]:
+                    _evaluate_pair(i, j, "CROSS_CATEGORY")
 
     pairs.sort(key=lambda p: (not p.flagged, -p.description_cosine, p.a_invoice))
     return pairs

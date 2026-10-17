@@ -269,3 +269,30 @@ def test_verdict_falls_back_when_the_model_is_unavailable(monkeypatch):
     assert verdict["source"] == "deterministic"
     assert verdict["risk_level"] == "CRITICAL"
     assert verdict["ai_risk_level"] is None
+
+
+def test_two_tier_cross_validation_intra_category_provenance():
+    """Level 1 (Intra-Category) tags like-for-like vendor comparisons."""
+    a = _record("INV-2025-03712", "FleetMech GmbH", "V004", "2025-06-10", SERVICES)
+    b = _record("INV-2025-03791", "IberMaint S.L.", "V014", "2025-07-07", SERVICES)
+    a["vendor_master"]["category"] = "Maintenance"
+    b["vendor_master"]["category"] = "Maintenance"
+    pairs = find_within_batch_pairs([a, b], Embedder())
+    assert len(pairs) == 1
+    assert pairs[0].tier == "INTRA_CATEGORY"
+    assert pairs[0].pattern == "SHARED_PACKAGE_APPROVED_VENDORS"
+    assert pairs[0].flagged is False
+
+
+def test_two_tier_cross_validation_unmapped_sentinel_catches_unknown_vendor():
+    """Level 2 (Unmapped Sentinel) cross-scans unknown/unclassified vendors across all records."""
+    a = _record("INV-2025-03760", "StationOps GmbH", "V010", "2025-06-22", SERVICES)
+    b = _record("INV-2025-03955", "LogiTrans Express SRL", None, "2025-07-08", SERVICES)
+    a["vendor_master"]["category"] = "Station Operations"
+    # b has no category (unmapped / unknown vendor)
+    b["vendor_master"]["category"] = None
+    pairs = find_within_batch_pairs([a, b], Embedder())
+    assert len(pairs) == 1
+    assert pairs[0].tier == "UNMAPPED_SENTINEL"
+    assert pairs[0].pattern == "CLONE_PACKAGE_BLOCKED_VENDOR"
+    assert pairs[0].flagged is True
